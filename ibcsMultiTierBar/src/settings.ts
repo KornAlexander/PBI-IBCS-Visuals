@@ -71,7 +71,19 @@ class GeneralCard extends FormattingSettingsCard {
             { value: "variance", displayName: "Δ Absolute" },
             { value: "variancePct", displayName: "Δ Percent" }
         ],
-        value: { value: "category", displayName: "Category" }
+        value: { value: "actual", displayName: "Actual" }
+    });
+
+    pctOutlierCutoff = new formattingSettings.NumUpDown({
+        name: "pctOutlierCutoff",
+        displayName: "Δ% outlier cutoff (%)",
+        value: 0
+    });
+
+    absOutlierCutoff = new formattingSettings.NumUpDown({
+        name: "absOutlierCutoff",
+        displayName: "Δ absolute outlier cutoff",
+        value: 0
     });
 
     sortDir = new formattingSettings.ItemDropdown({
@@ -101,7 +113,8 @@ class GeneralCard extends FormattingSettingsCard {
     slices: Array<FormattingSettingsSlice> = [
         this.scenario, this.invert, this.showAbsoluteTier, this.showPercentTier,
         this.decimals, this.axisWidthPercent, this.maxVisibleCategories, this.enableScrollbar,
-        this.sortBy, this.sortDir, this.showFirstLastDelta, this.minBandPx
+        this.sortBy, this.sortDir, this.showFirstLastDelta, this.minBandPx,
+        this.pctOutlierCutoff, this.absOutlierCutoff
     ];
 }
 

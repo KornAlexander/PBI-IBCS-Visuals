@@ -103,6 +103,8 @@ export class Visual implements IVisual {
             minBandPx: Math.max(8, Math.round(this.formattingSettings.general.minBandPx.value ?? 48)),
             sortBy: (this.formattingSettings.general.sortBy.value.value as ChartConfig["sortBy"]) ?? "category",
             sortDir: (this.formattingSettings.general.sortDir.value.value as ChartConfig["sortDir"]) ?? "asc",
+            pctOutlierCutoff: Math.max(0, this.formattingSettings.general.pctOutlierCutoff.value ?? 0),
+            absOutlierCutoff: Math.max(0, this.formattingSettings.general.absOutlierCutoff.value ?? 0),
             showFirstLastDelta: this.formattingSettings.general.showFirstLastDelta.value,
             font: {
                 family: this.formattingSettings.text.font.fontFamily.value || "Segoe UI, sans-serif",

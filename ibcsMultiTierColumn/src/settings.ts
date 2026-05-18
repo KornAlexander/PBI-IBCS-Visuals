@@ -96,12 +96,25 @@ class GeneralCard extends FormattingSettingsCard {
         value: 48
     });
 
+    pctOutlierCutoff = new formattingSettings.NumUpDown({
+        name: "pctOutlierCutoff",
+        displayName: "Δ% outlier cutoff (%)",
+        value: 0
+    });
+
+    absOutlierCutoff = new formattingSettings.NumUpDown({
+        name: "absOutlierCutoff",
+        displayName: "Δ absolute outlier cutoff",
+        value: 0
+    });
+
     name: string = "general";
     displayName: string = "General";
     slices: Array<FormattingSettingsSlice> = [
         this.scenario, this.invert, this.showAbsoluteTier, this.showPercentTier,
         this.decimals, this.axisWidthPercent, this.maxVisibleCategories, this.enableScrollbar,
-        this.sortBy, this.sortDir, this.showFirstLastDelta, this.minBandPx
+        this.sortBy, this.sortDir, this.showFirstLastDelta, this.minBandPx,
+        this.pctOutlierCutoff, this.absOutlierCutoff
     ];
 }
 

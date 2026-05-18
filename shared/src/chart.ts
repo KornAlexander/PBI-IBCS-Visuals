@@ -40,6 +40,10 @@ export interface ChartConfig {
   sortBy: "category" | "actual" | "reference" | "variance" | "variancePct";
   /** Sort direction. */
   sortDir: "asc" | "desc";
+  /** Δ% outlier cutoff in percent (e.g. 50 => |Δ%| > 50% is treated as outlier). 0 = disabled. */
+  pctOutlierCutoff: number;
+  /** Δ absolute outlier cutoff in raw units. 0 = disabled. */
+  absOutlierCutoff: number;
   /** Column orientation only: draw a line from the first AC bar top to the last AC bar top, with the delta to the right. */
   showFirstLastDelta: boolean;
   /** Font/text styling applied to all labels, headers and axis text. */
@@ -390,7 +394,12 @@ function drawVarianceTierColumn(
   sharedPPU?: number
 ) {
   const accessor = (v: VariancePoint) => (mode === "abs" ? v.absolute : v.percent);
-  const vals = variance.map(accessor).filter((v): v is number => v != null);
+  const cutoff = mode === "abs" ? cfg.absOutlierCutoff : cfg.pctOutlierCutoff / 100;
+  const isOutlier = (v: number | null | undefined): boolean =>
+    v != null && cutoff > 0 && Math.abs(v) > cutoff;
+  const vals = variance
+    .map(accessor)
+    .filter((v): v is number => v != null && !isOutlier(v));
   let y: d3.ScaleLinear<number, number>;
   if (mode === "abs" && sharedPPU && sharedPPU > 0) {
     const half = h / 2;
@@ -429,7 +438,8 @@ function drawVarianceTierColumn(
       .attr("y1", y(0))
       .attr("y2", (d) => {
         const v = accessor(d);
-        return v == null ? y(0) : y(v);
+        if (v == null || isOutlier(v)) return y(0);
+        return y(v);
       })
       .attr("stroke", (d) => colorForVariance(accessor(d), cfg))
       .attr("stroke-width", 1);
@@ -442,10 +452,17 @@ function drawVarianceTierColumn(
       .attr("x", (d) => (x(d.category) ?? 0) + band / 2 - PIN / 2)
       .attr("y", (d) => {
         const v = accessor(d);
-        return (v == null ? y(0) : y(v)) - PIN / 2;
+        if (v == null || isOutlier(v)) return y(0) - PIN / 2;
+        return y(v) - PIN / 2;
       })
-      .attr("width", (d) => (accessor(d) == null ? 0 : PIN))
-      .attr("height", (d) => (accessor(d) == null ? 0 : PIN))
+      .attr("width", (d) => {
+        const v = accessor(d);
+        return v == null || isOutlier(v) ? 0 : PIN;
+      })
+      .attr("height", (d) => {
+        const v = accessor(d);
+        return v == null || isOutlier(v) ? 0 : PIN;
+      })
       .attr("fill", (d) => colorForVariance(accessor(d), cfg))
       .style("cursor", "pointer");
   } else {
@@ -457,14 +474,14 @@ function drawVarianceTierColumn(
       .attr("x", (d) => x(d.category) ?? 0)
       .attr("y", (d) => {
         const v = accessor(d);
-        if (v == null) return y(0);
+        if (v == null || isOutlier(v)) return y(0);
         // Clamp to tier bounds when shared PPU pushes the bar past [0, h].
         return v >= 0 ? Math.max(0, y(v)) : y(0);
       })
       .attr("width", band)
       .attr("height", (d) => {
         const v = accessor(d);
-        if (v == null) return 0;
+        if (v == null || isOutlier(v)) return 0;
         const top = v >= 0 ? Math.max(0, y(v)) : y(0);
         const bot = v >= 0 ? y(0) : Math.min(h, y(v));
         return Math.max(0, bot - top);
@@ -484,6 +501,7 @@ function drawVarianceTierColumn(
     .attr("y", (d) => {
       const v = accessor(d);
       if (v == null) return y(0);
+      if (isOutlier(v)) return v >= 0 ? Math.max(cfg.font.size, y(0) - 2) : Math.min(h - 2, y(0) + cfg.font.size + 1);
       return v >= 0 ? Math.max(cfg.font.size, y(v) - 2) : Math.min(h - 2, y(v) + cfg.font.size + 1);
     })
     .attr("text-anchor", "middle")
@@ -675,7 +693,12 @@ function drawVarianceTierBar(
   sharedPPU?: number
 ) {
   const accessor = (v: VariancePoint) => (mode === "abs" ? v.absolute : v.percent);
-  const vals = variance.map(accessor).filter((v): v is number => v != null);
+  const cutoff = mode === "abs" ? cfg.absOutlierCutoff : cfg.pctOutlierCutoff / 100;
+  const isOutlier = (v: number | null | undefined): boolean =>
+    v != null && cutoff > 0 && Math.abs(v) > cutoff;
+  const vals = variance
+    .map(accessor)
+    .filter((v): v is number => v != null && !isOutlier(v));
   let x: d3.ScaleLinear<number, number>;
   if (mode === "abs" && sharedPPU && sharedPPU > 0) {
     const half = w / 2;
@@ -710,7 +733,8 @@ function drawVarianceTierBar(
       .attr("x1", x(0))
       .attr("x2", (d) => {
         const v = accessor(d);
-        return v == null ? x(0) : x(v);
+        if (v == null || isOutlier(v)) return x(0);
+        return x(v);
       })
       .attr("y1", (d) => (y(d.category) ?? 0) + band / 2)
       .attr("y2", (d) => (y(d.category) ?? 0) + band / 2)
@@ -724,11 +748,18 @@ function drawVarianceTierBar(
       .attr("data-cat", (d) => d.category)
       .attr("x", (d) => {
         const v = accessor(d);
-        return (v == null ? x(0) : x(v)) - PIN / 2;
+        if (v == null || isOutlier(v)) return x(0) - PIN / 2;
+        return x(v) - PIN / 2;
       })
       .attr("y", (d) => (y(d.category) ?? 0) + band / 2 - PIN / 2)
-      .attr("width", (d) => (accessor(d) == null ? 0 : PIN))
-      .attr("height", (d) => (accessor(d) == null ? 0 : PIN))
+      .attr("width", (d) => {
+        const v = accessor(d);
+        return v == null || isOutlier(v) ? 0 : PIN;
+      })
+      .attr("height", (d) => {
+        const v = accessor(d);
+        return v == null || isOutlier(v) ? 0 : PIN;
+      })
       .attr("fill", (d) => colorForVariance(accessor(d), cfg))
       .style("cursor", "pointer");
   } else {
@@ -739,13 +770,13 @@ function drawVarianceTierBar(
     .attr("data-cat", (d) => d.category)
     .attr("x", (d) => {
       const v = accessor(d);
-      if (v == null) return x(0);
+      if (v == null || isOutlier(v)) return x(0);
       return v >= 0 ? x(0) : Math.max(0, x(v));
     })
     .attr("y", (d) => y(d.category) ?? 0)
     .attr("width", (d) => {
       const v = accessor(d);
-      if (v == null) return 0;
+      if (v == null || isOutlier(v)) return 0;
       const start = v >= 0 ? x(0) : Math.max(0, x(v));
       const end = v >= 0 ? Math.min(w, x(v)) : x(0);
       return Math.max(0, end - start);
@@ -765,6 +796,7 @@ function drawVarianceTierBar(
     .attr("x", (d) => {
       const v = accessor(d);
       if (v == null) return x(0);
+      if (isOutlier(v)) return v >= 0 ? Math.min(w - 2, x(0) + 3) : Math.max(2, x(0) - 3);
       // Clamp the anchor so labels never escape the tier rectangle [0, w].
       const pos = v >= 0 ? Math.min(w - 2, x(v) + 3) : Math.max(2, x(v) - 3);
       return pos;
@@ -774,6 +806,7 @@ function drawVarianceTierBar(
     .attr("text-anchor", (d) => {
       const v = accessor(d);
       if (v == null) return "start";
+      if (isOutlier(v)) return v >= 0 ? "start" : "end";
       // Flip anchor when the bar end would overflow the tier, so the label stays inside.
       if (v >= 0) return x(v) + 3 > w - 2 ? "end" : "start";
       return x(v) - 3 < 2 ? "start" : "end";
