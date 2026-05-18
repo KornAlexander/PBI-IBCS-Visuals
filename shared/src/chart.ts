@@ -189,9 +189,12 @@ function renderColumn(
   const overflowing = cfg.enableScrollbar && n > cfg.maxVisibleCategories;
   const padL = 8;
   const padR = 12;
+  // Reserve space for the horizontal scrollbar so labels are not hidden beneath it.
+  const scrollbarReserve = overflowing ? 14 : 0;
+  const chartH = Math.max(80, cfg.height - scrollbarReserve);
   const axisH = cfg.font.size + 6;
   const tierGapTotal = TIER_GAP * (numTiers(cfg) - 1);
-  const hUsable = cfg.height - axisH - tierGapTotal - 14; // 14 = top space for headers
+  const hUsable = chartH - axisH - tierGapTotal - 14; // 14 = top space for headers
   // Tier order (top -> bottom): abs deviation, pct deviation (pin), base AC|scenario.
   // Ratios mirror that order: [20, 20, 60].
   const ratios = [cfg.showAbsoluteTier ? 20 : 0, cfg.showPercentTier ? 20 : 0, 60];
@@ -204,7 +207,7 @@ function renderColumn(
     ? Math.max(cfg.minBandPx, viewportInnerW / Math.max(1, cfg.maxVisibleCategories))
     : 0;
   const svgW = overflowing ? Math.max(cfg.width, n * colW + padL + padR) : cfg.width;
-  svg.attr("width", svgW).attr("height", cfg.height);
+  svg.attr("width", svgW).attr("height", chartH);
 
   const innerW = svgW - padL - padR;
   const x = d3
@@ -506,6 +509,9 @@ function renderBar(
   const padTop = 22;
   // No bottom padding when scrolling, otherwise the next row peeks below the viewport.
   const padBottom = overflowing ? 0 : 6;
+  // Reserve space for the vertical scrollbar so the rendered width matches the visible width.
+  const scrollbarReserve = overflowing ? 14 : 0;
+  const chartW = Math.max(80, cfg.width - scrollbarReserve);
 
   // SVG height accommodates either viewport or per-row min-band when overflowing.
   const visibleN = Math.min(n, cfg.maxVisibleCategories);
@@ -515,11 +521,11 @@ function renderBar(
     : Math.max(cfg.minBandPx, innerHViewport / Math.max(1, visibleN));
   const innerH = overflowing ? rowH * n : innerHViewport;
   const svgH = overflowing ? innerH + padTop + padBottom : cfg.height;
-  svg.attr("width", cfg.width).attr("height", svgH);
+  svg.attr("width", chartW).attr("height", svgH);
 
   // Axis width: percentage of chart width, clamped 5..60
   const pct = Math.min(60, Math.max(5, cfg.axisWidthPercent));
-  const axisW = Math.round((cfg.width * pct) / 100);
+  const axisW = Math.round((chartW * pct) / 100);
 
   const y = d3
     .scaleBand<string>()
@@ -545,7 +551,7 @@ function renderBar(
   labels.append("title").text((d) => d.category);
   truncateTextEnd<CategoryPoint>(labels, () => axisW - 8);
 
-  const totalW = cfg.width - axisW;
+  const totalW = chartW - axisW;
   const ratios = [60, cfg.showAbsoluteTier ? 20 : 0, cfg.showPercentTier ? 20 : 0];
   const sum = ratios.reduce((a, b) => a + b, 0) || 60;
   const usableW = totalW - TIER_GAP * (numTiers(cfg) - 1);

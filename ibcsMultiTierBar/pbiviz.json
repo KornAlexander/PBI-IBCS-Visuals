@@ -4,7 +4,7 @@
     "displayName": "IBCS Multi-Tier Bar",
     "guid": "ibcsMultiTierBarECA4F65BFFB141198B7A6391AFFC946A",
     "visualClassName": "Visual",
-    "version": "1.0.0.15",
+    "version": "1.0.0.16",
     "description": "IBCS-compliant integrated variance bar chart (AC vs PY/PL/BU, with absolute and percent variance tiers).",
     "supportUrl": "https://github.com/alkorn/PBI-IBCS-Visuals",
     "gitHubUrl": "https://github.com/alkorn/PBI-IBCS-Visuals"
@@ -22,5 +22,5 @@
   "capabilities": "capabilities.json",
   "dependencies": null,
   "stringResources": [],
-  "version": "1.0.0.15"
+  "version": "1.0.0.16"
 }

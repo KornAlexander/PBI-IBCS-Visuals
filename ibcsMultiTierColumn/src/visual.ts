@@ -48,7 +48,7 @@ export class Visual implements IVisual {
         this.selectionManager.registerOnSelectCallback(() => this.rerender());
 
         const wrap = document.createElement("div");
-        wrap.style.cssText = "width:100%;height:100%;overflow:auto;";
+        wrap.style.cssText = "width:100%;height:100%;overflow-x:auto;overflow-y:hidden;";
         this.target.appendChild(wrap);
         this.scrollWrap = wrap;
 
@@ -124,7 +124,8 @@ export class Visual implements IVisual {
         };
 
         const data: ChartData = { points: Array.from(this.pointsByCategory.values()) };
-        this.scrollWrap.style.overflow = cfg.enableScrollbar ? "auto" : "hidden";
+        this.scrollWrap.style.overflowX = cfg.enableScrollbar ? "auto" : "hidden";
+        this.scrollWrap.style.overflowY = "hidden";
         renderChart(this.svg, data, cfg);
     }
 
