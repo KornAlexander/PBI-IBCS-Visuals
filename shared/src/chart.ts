@@ -443,12 +443,17 @@ function drawVarianceTierColumn(
       .attr("x", (d) => x(d.category) ?? 0)
       .attr("y", (d) => {
         const v = accessor(d);
-        return v == null ? y(0) : v >= 0 ? y(v) : y(0);
+        if (v == null) return y(0);
+        // Clamp to tier bounds when shared PPU pushes the bar past [0, h].
+        return v >= 0 ? Math.max(0, y(v)) : y(0);
       })
       .attr("width", band)
       .attr("height", (d) => {
         const v = accessor(d);
-        return v == null ? 0 : Math.abs(y(v) - y(0));
+        if (v == null) return 0;
+        const top = v >= 0 ? Math.max(0, y(v)) : y(0);
+        const bot = v >= 0 ? y(0) : Math.min(h, y(v));
+        return Math.max(0, bot - top);
       })
       .attr("fill", (d) => colorForVariance(accessor(d), cfg))
       .style("cursor", "pointer");
@@ -488,7 +493,8 @@ function renderBar(
   const n = points.length;
   const overflowing = cfg.enableScrollbar && n > cfg.maxVisibleCategories;
   const padTop = 22;
-  const padBottom = 6;
+  // No bottom padding when scrolling, otherwise the next row peeks below the viewport.
+  const padBottom = overflowing ? 0 : 6;
 
   // SVG height accommodates either viewport or per-row min-band when overflowing.
   const visibleN = Math.min(n, cfg.maxVisibleCategories);
@@ -708,12 +714,15 @@ function drawVarianceTierBar(
     .attr("x", (d) => {
       const v = accessor(d);
       if (v == null) return x(0);
-      return v >= 0 ? x(0) : x(v);
+      return v >= 0 ? x(0) : Math.max(0, x(v));
     })
     .attr("y", (d) => y(d.category) ?? 0)
     .attr("width", (d) => {
       const v = accessor(d);
-      return v == null ? 0 : Math.abs(x(v) - x(0));
+      if (v == null) return 0;
+      const start = v >= 0 ? x(0) : Math.max(0, x(v));
+      const end = v >= 0 ? Math.min(w, x(v)) : x(0);
+      return Math.max(0, end - start);
     })
     .attr("height", band)
     .attr("fill", (d) => colorForVariance(accessor(d), cfg))
@@ -730,13 +739,18 @@ function drawVarianceTierBar(
     .attr("x", (d) => {
       const v = accessor(d);
       if (v == null) return x(0);
-      return v >= 0 ? x(v) + 3 : x(v) - 3;
+      // Clamp the anchor so labels never escape the tier rectangle [0, w].
+      const pos = v >= 0 ? Math.min(w - 2, x(v) + 3) : Math.max(2, x(v) - 3);
+      return pos;
     })
     .attr("y", (d) => (y(d.category) ?? 0) + band / 2)
     .attr("dominant-baseline", "middle")
     .attr("text-anchor", (d) => {
       const v = accessor(d);
-      return v != null && v < 0 ? "end" : "start";
+      if (v == null) return "start";
+      // Flip anchor when the bar end would overflow the tier, so the label stays inside.
+      if (v >= 0) return x(v) + 3 > w - 2 ? "end" : "start";
+      return x(v) - 3 < 2 ? "start" : "end";
     })
     .attr("font-size", LABEL_SIZE)
     .attr("fill", "#333")
