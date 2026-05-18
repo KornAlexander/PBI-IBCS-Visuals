@@ -129,7 +129,6 @@ function truncateTextEnd<T>(
 }
 
 function sortPoints(points: CategoryPoint[], cfg: ChartConfig): CategoryPoint[] {
-  if (cfg.sortBy === "category" && cfg.sortDir === "asc") return points;
   const dir = cfg.sortDir === "asc" ? 1 : -1;
   const keyOf = (p: CategoryPoint): number | string => {
     switch (cfg.sortBy) {
