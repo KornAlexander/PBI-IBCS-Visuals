@@ -1,0 +1,35 @@
+#!/usr/bin/env node
+/**
+ * Bumps the last segment of the 4-part version in pbiviz.json and package.json.
+ * Runs before `pbiviz package` in each visual folder.
+ *   1.0.0.0  ->  1.0.0.1
+ *   1.0.0.9  ->  1.0.0.10
+ */
+const fs = require("fs");
+const path = require("path");
+
+const cwd = process.cwd();
+const pbivizPath = path.join(cwd, "pbiviz.json");
+const pkgPath = path.join(cwd, "package.json");
+
+function bump(v) {
+  const parts = String(v).split(".");
+  while (parts.length < 4) parts.push("0");
+  parts[3] = String((parseInt(parts[3], 10) || 0) + 1);
+  return parts.join(".");
+}
+
+const pbiviz = JSON.parse(fs.readFileSync(pbivizPath, "utf8"));
+const oldV = pbiviz.visual.version;
+const newV = bump(oldV);
+pbiviz.visual.version = newV;
+pbiviz.version = newV;
+fs.writeFileSync(pbivizPath, JSON.stringify(pbiviz, null, 2) + "\n");
+
+if (fs.existsSync(pkgPath)) {
+  const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+  pkg.version = newV;
+  fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
+}
+
+console.log(`[bump-version] ${path.basename(cwd)}: ${oldV} -> ${newV}`);

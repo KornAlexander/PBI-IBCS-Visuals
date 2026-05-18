@@ -15,9 +15,13 @@ if (!fs.existsSync(distDir)) {
   process.exit(1);
 }
 
-const pbivizFiles = fs.readdirSync(distDir).filter((f) => f.endsWith(".pbiviz"));
+const pbivizMeta = JSON.parse(fs.readFileSync(path.join(cwd, "pbiviz.json"), "utf8"));
+const currentVersion = pbivizMeta.visual.version;
+const pbivizFiles = fs
+  .readdirSync(distDir)
+  .filter((f) => f.endsWith(`.${currentVersion}.pbiviz`));
 if (pbivizFiles.length === 0) {
-  console.error("[copy-pbiviz] No .pbiviz found in", distDir);
+  console.error(`[copy-pbiviz] No .pbiviz for version ${currentVersion} in`, distDir);
   process.exit(1);
 }
 
