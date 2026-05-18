@@ -4,7 +4,7 @@
     "displayName": "IBCS Multi-Tier Column",
     "guid": "ibcsMultiTierColumnB84BA14B8B6A4201A7F698B3B38DD148",
     "visualClassName": "Visual",
-    "version": "1.0.0.3",
+    "version": "1.0.0.4",
     "description": "IBCS-compliant integrated variance column chart (AC vs PY/PL/BU, with absolute and percent variance tiers).",
     "supportUrl": "https://github.com/alkorn/PBI-IBCS-Visuals",
     "gitHubUrl": "https://github.com/alkorn/PBI-IBCS-Visuals"
@@ -22,5 +22,5 @@
   "capabilities": "capabilities.json",
   "dependencies": null,
   "stringResources": [],
-  "version": "1.0.0.3"
+  "version": "1.0.0.4"
 }

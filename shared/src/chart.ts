@@ -98,6 +98,28 @@ function applySelectionDimming(
   });
 }
 
+/** Truncate <text> elements at the END with an ellipsis when they exceed maxWidthFn(d). */
+function truncateTextEnd<T>(
+  selection: d3.Selection<SVGTextElement, T, SVGGElement | SVGSVGElement, unknown>,
+  maxWidthFn: (d: T) => number
+): void {
+  selection.each(function (d) {
+    const node = this as SVGTextElement;
+    const full = node.textContent ?? "";
+    const maxW = maxWidthFn(d);
+    if (!full || maxW <= 0 || node.getComputedTextLength() <= maxW) return;
+    let lo = 0;
+    let hi = full.length;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      node.textContent = full.slice(0, mid) + "\u2026";
+      if (node.getComputedTextLength() <= maxW) lo = mid;
+      else hi = mid - 1;
+    }
+    node.textContent = (lo === 0 ? "" : full.slice(0, lo)) + "\u2026";
+  });
+}
+
 function defs(svg: d3.Selection<SVGSVGElement, unknown, null, undefined>) {
   const defs = svg.append("defs");
   const p = defs
@@ -165,8 +187,8 @@ function renderColumn(
 
   // Category axis
   const axisG = svg.append("g").attr("transform", `translate(${padL},${cfg.height - axisH + 2})`);
-  axisG
-    .selectAll("text")
+  const colLabels = axisG
+    .selectAll<SVGTextElement, CategoryPoint>("text")
     .data(points)
     .enter()
     .append("text")
@@ -176,6 +198,8 @@ function renderColumn(
     .attr("font-size", AXIS_SIZE)
     .attr("fill", "#333")
     .text((d) => d.category);
+  colLabels.append("title").text((d) => d.category);
+  truncateTextEnd<CategoryPoint>(colLabels, () => x.bandwidth() + 2);
 }
 
 function drawBaseTierColumn(
@@ -284,23 +308,57 @@ function drawVarianceTierColumn(
     .attr("stroke", "#666").attr("stroke-width", 0.75);
 
   const band = x.bandwidth();
-  g.selectAll("rect.var")
-    .data(variance).enter()
-    .append("rect")
-    .attr("class", "var")
-    .attr("data-cat", (d) => d.category)
-    .attr("x", (d) => x(d.category) ?? 0)
-    .attr("y", (d) => {
-      const v = accessor(d);
-      return v == null ? y(0) : v >= 0 ? y(v) : y(0);
-    })
-    .attr("width", band)
-    .attr("height", (d) => {
-      const v = accessor(d);
-      return v == null ? 0 : Math.abs(y(v) - y(0));
-    })
-    .attr("fill", (d) => colorForVariance(accessor(d), cfg))
-    .style("cursor", "pointer");
+  if (mode === "pct") {
+    // Pin notation: thin line from zero baseline to value, with small square head.
+    const PIN = 5;
+    g.selectAll("line.pin")
+      .data(variance).enter()
+      .append("line")
+      .attr("class", "pin")
+      .attr("data-cat", (d) => d.category)
+      .attr("x1", (d) => (x(d.category) ?? 0) + band / 2)
+      .attr("x2", (d) => (x(d.category) ?? 0) + band / 2)
+      .attr("y1", y(0))
+      .attr("y2", (d) => {
+        const v = accessor(d);
+        return v == null ? y(0) : y(v);
+      })
+      .attr("stroke", (d) => colorForVariance(accessor(d), cfg))
+      .attr("stroke-width", 1);
+
+    g.selectAll("rect.pin-head")
+      .data(variance).enter()
+      .append("rect")
+      .attr("class", "pin-head")
+      .attr("data-cat", (d) => d.category)
+      .attr("x", (d) => (x(d.category) ?? 0) + band / 2 - PIN / 2)
+      .attr("y", (d) => {
+        const v = accessor(d);
+        return (v == null ? y(0) : y(v)) - PIN / 2;
+      })
+      .attr("width", (d) => (accessor(d) == null ? 0 : PIN))
+      .attr("height", (d) => (accessor(d) == null ? 0 : PIN))
+      .attr("fill", (d) => colorForVariance(accessor(d), cfg))
+      .style("cursor", "pointer");
+  } else {
+    g.selectAll("rect.var")
+      .data(variance).enter()
+      .append("rect")
+      .attr("class", "var")
+      .attr("data-cat", (d) => d.category)
+      .attr("x", (d) => x(d.category) ?? 0)
+      .attr("y", (d) => {
+        const v = accessor(d);
+        return v == null ? y(0) : v >= 0 ? y(v) : y(0);
+      })
+      .attr("width", band)
+      .attr("height", (d) => {
+        const v = accessor(d);
+        return v == null ? 0 : Math.abs(y(v) - y(0));
+      })
+      .attr("fill", (d) => colorForVariance(accessor(d), cfg))
+      .style("cursor", "pointer");
+  }
 
   attachInteractivity(g, cfg);
 
@@ -357,10 +415,10 @@ function renderBar(
     .paddingInner(0.25)
     .paddingOuter(0.15);
 
-  // Category labels on the left, clipped to axisW
+  // Category labels on the left, truncated to axisW with trailing ellipsis if too long
   const axisG = svg.append("g").attr("transform", `translate(0,${padTop})`);
-  axisG
-    .selectAll("text")
+  const labels = axisG
+    .selectAll<SVGTextElement, CategoryPoint>("text")
     .data(points)
     .enter()
     .append("text")
@@ -370,9 +428,9 @@ function renderBar(
     .attr("text-anchor", "end")
     .attr("font-size", AXIS_SIZE)
     .attr("fill", "#333")
-    .text((d) => d.category)
-    .append("title")
     .text((d) => d.category);
+  labels.append("title").text((d) => d.category);
+  truncateTextEnd<CategoryPoint>(labels, () => axisW - 8);
 
   const totalW = cfg.width - axisW;
   const ratios = [60, cfg.showAbsoluteTier ? 20 : 0, cfg.showPercentTier ? 20 : 0];
@@ -499,9 +557,42 @@ function drawVarianceTierBar(
     .attr("stroke", "#666").attr("stroke-width", 0.75);
 
   const band = y.bandwidth();
-  g.selectAll("rect.var")
-    .data(variance).enter()
-    .append("rect")
+  if (mode === "pct") {
+    // Pin notation: thin line from zero baseline to value, with small square head.
+    const PIN = 5;
+    g.selectAll("line.pin")
+      .data(variance).enter()
+      .append("line")
+      .attr("class", "pin")
+      .attr("data-cat", (d) => d.category)
+      .attr("x1", x(0))
+      .attr("x2", (d) => {
+        const v = accessor(d);
+        return v == null ? x(0) : x(v);
+      })
+      .attr("y1", (d) => (y(d.category) ?? 0) + band / 2)
+      .attr("y2", (d) => (y(d.category) ?? 0) + band / 2)
+      .attr("stroke", (d) => colorForVariance(accessor(d), cfg))
+      .attr("stroke-width", 1);
+
+    g.selectAll("rect.pin-head")
+      .data(variance).enter()
+      .append("rect")
+      .attr("class", "pin-head")
+      .attr("data-cat", (d) => d.category)
+      .attr("x", (d) => {
+        const v = accessor(d);
+        return (v == null ? x(0) : x(v)) - PIN / 2;
+      })
+      .attr("y", (d) => (y(d.category) ?? 0) + band / 2 - PIN / 2)
+      .attr("width", (d) => (accessor(d) == null ? 0 : PIN))
+      .attr("height", (d) => (accessor(d) == null ? 0 : PIN))
+      .attr("fill", (d) => colorForVariance(accessor(d), cfg))
+      .style("cursor", "pointer");
+  } else {
+    g.selectAll("rect.var")
+      .data(variance).enter()
+      .append("rect")
     .attr("class", "var")
     .attr("data-cat", (d) => d.category)
     .attr("x", (d) => {
@@ -517,6 +608,7 @@ function drawVarianceTierBar(
     .attr("height", band)
     .attr("fill", (d) => colorForVariance(accessor(d), cfg))
     .style("cursor", "pointer");
+  }
 
   attachInteractivity(g, cfg);
 
