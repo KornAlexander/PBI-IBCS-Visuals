@@ -9,6 +9,7 @@ yarn-error.log*
 dist/
 *.pbiviz
 *.log
+webpack.statistics.*.html
 
 # Test artifacts
 coverage/
