@@ -175,9 +175,21 @@ class AboutCard extends FormattingSettingsCard {
         value: VISUAL_VERSION
     });
 
+    author = new formattingSettings.ReadOnlyText({
+        name: "author",
+        displayName: "Author",
+        value: "Alexander Korn"
+    });
+
+    website = new formattingSettings.ReadOnlyText({
+        name: "website",
+        displayName: "Website",
+        value: "actionablereporting.com"
+    });
+
     name: string = "about";
     displayName: string = "About";
-    slices: Array<FormattingSettingsSlice> = [this.version];
+    slices: Array<FormattingSettingsSlice> = [this.version, this.author, this.website];
 }
 
 export class VisualFormattingSettingsModel extends FormattingSettingsModel {

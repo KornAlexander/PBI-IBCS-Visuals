@@ -69,7 +69,9 @@
     },
     "about": {
       "properties": {
-        "version": { "type": { "text": true } }
+        "version": { "type": { "text": true } },
+        "author": { "type": { "text": true } },
+        "website": { "type": { "text": true } }
       }
     }
   },
