@@ -156,8 +156,12 @@ function renderColumn(
   const sum = ratios.reduce((a, b) => a + b, 0) || 60;
   const tierH = ratios.map((r) => (r / sum) * hUsable);
 
-  // SVG width: max(viewport, minBandPx*n + padding)
-  const svgW = overflowing ? Math.max(cfg.width, n * cfg.minBandPx + padL + padR) : cfg.width;
+  // SVG width: when overflowing, size columns so exactly maxVisibleCategories fit in the viewport.
+  const viewportInnerW = cfg.width - padL - padR;
+  const colW = overflowing
+    ? Math.max(cfg.minBandPx, viewportInnerW / Math.max(1, cfg.maxVisibleCategories))
+    : 0;
+  const svgW = overflowing ? Math.max(cfg.width, n * colW + padL + padR) : cfg.width;
   svg.attr("width", svgW).attr("height", cfg.height);
 
   const innerW = svgW - padL - padR;
@@ -415,7 +419,9 @@ function renderBar(
   // SVG height accommodates either viewport or per-row min-band when overflowing.
   const visibleN = Math.min(n, cfg.maxVisibleCategories);
   const innerHViewport = cfg.height - padTop - padBottom;
-  const rowH = overflowing ? cfg.minBandPx : Math.max(cfg.minBandPx, innerHViewport / Math.max(1, visibleN));
+  const rowH = overflowing
+    ? Math.max(cfg.minBandPx, innerHViewport / Math.max(1, cfg.maxVisibleCategories))
+    : Math.max(cfg.minBandPx, innerHViewport / Math.max(1, visibleN));
   const innerH = overflowing ? rowH * n : innerHViewport;
   const svgH = overflowing ? innerH + padTop + padBottom : cfg.height;
   svg.attr("width", cfg.width).attr("height", svgH);
