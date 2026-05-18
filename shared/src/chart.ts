@@ -636,15 +636,24 @@ function drawBaseTierBar(
 
   attachInteractivity(g, cfg);
 
-  // AC labels (at end of bar)
+  // AC labels (at end of bar, clamped inside the base tier so they cannot collide with the next tier)
   g.selectAll(".lbl-ac")
     .data(points).enter()
     .append("text")
     .attr("class", "lbl-ac")
     .attr("data-cat", (d) => d.category)
-    .attr("x", (d) => x(d.actual ?? 0) + 3)
+    .attr("x", (d) => {
+      const v = d.actual ?? 0;
+      // Position 3px past the bar end, but never past the tier edge.
+      return v >= 0 ? Math.min(w - 2, x(v) + 3) : Math.max(2, x(v) - 3);
+    })
     .attr("y", (d) => (y(d.category) ?? 0) + acOffset + barH / 2)
     .attr("dominant-baseline", "middle")
+    .attr("text-anchor", (d) => {
+      const v = d.actual ?? 0;
+      if (v >= 0) return x(v) + 3 > w - 2 ? "end" : "start";
+      return x(v) - 3 < 2 ? "start" : "end";
+    })
     .attr("font-size", cfg.font.size)
     .attr("fill", cfg.font.color)
     .text((d) => (d.actual == null ? "" : formatNumber(d.actual, { decimals: cfg.decimals })));
