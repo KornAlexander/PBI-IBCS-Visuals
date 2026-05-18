@@ -21,6 +21,8 @@
         "showAbsoluteTier": { "type": { "bool": true } },
         "showPercentTier": { "type": { "bool": true } },
         "decimals": { "type": { "numeric": true } },
+        "decimalsAbs": { "type": { "numeric": true } },
+        "decimalsPct": { "type": { "numeric": true } },
         "axisWidthPercent": { "type": { "numeric": true } },
         "maxVisibleCategories": { "type": { "numeric": true } },
         "enableScrollbar": { "type": { "bool": true } },

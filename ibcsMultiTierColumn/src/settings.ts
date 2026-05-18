@@ -40,7 +40,19 @@ class GeneralCard extends FormattingSettingsCard {
 
     decimals = new formattingSettings.NumUpDown({
         name: "decimals",
-        displayName: "Decimal places (base & Δ)",
+        displayName: "Decimal places — AC",
+        value: 0
+    });
+
+    decimalsAbs = new formattingSettings.NumUpDown({
+        name: "decimalsAbs",
+        displayName: "Decimal places — Δ absolute",
+        value: 0
+    });
+
+    decimalsPct = new formattingSettings.NumUpDown({
+        name: "decimalsPct",
+        displayName: "Decimal places — Δ%",
         value: 0
     });
 
@@ -113,7 +125,8 @@ class GeneralCard extends FormattingSettingsCard {
     displayName: string = "General";
     slices: Array<FormattingSettingsSlice> = [
         this.scenario, this.invert, this.showAbsoluteTier, this.showPercentTier,
-        this.decimals, this.axisWidthPercent, this.maxVisibleCategories, this.enableScrollbar,
+        this.decimals, this.decimalsAbs, this.decimalsPct,
+        this.axisWidthPercent, this.maxVisibleCategories, this.enableScrollbar,
         this.sortBy, this.sortDir, this.showFirstLastDelta, this.minBandPx,
         this.pctOutlierCutoff, this.absOutlierCutoff
     ];

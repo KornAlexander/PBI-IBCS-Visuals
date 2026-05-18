@@ -91,6 +91,8 @@ export class Visual implements IVisual {
             showAbsoluteTier: this.formattingSettings.general.showAbsoluteTier.value,
             showPercentTier: this.formattingSettings.general.showPercentTier.value,
             decimals: Math.max(0, Math.min(3, Math.round(this.formattingSettings.general.decimals.value ?? 0))),
+            decimalsAbs: Math.max(0, Math.min(3, Math.round(this.formattingSettings.general.decimalsAbs.value ?? 0))),
+            decimalsPct: Math.max(0, Math.min(3, Math.round(this.formattingSettings.general.decimalsPct.value ?? 0))),
             colors: {
                 positive: this.formattingSettings.colors.positive.value.value || PALETTE.positive,
                 negative: this.formattingSettings.colors.negative.value.value || PALETTE.negative,

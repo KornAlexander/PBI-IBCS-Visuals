@@ -21,7 +21,12 @@ export interface ChartConfig {
   invert: boolean;
   showAbsoluteTier: boolean;
   showPercentTier: boolean;
+  /** Decimal places for the Actual (AC) value. */
   decimals: number;
+  /** Decimal places for Δ absolute. Defaults to `decimals` if undefined. */
+  decimalsAbs?: number;
+  /** Decimal places for Δ percent. Defaults to 0. */
+  decimalsPct?: number;
   colors: {
     positive: string;
     negative: string;
@@ -369,7 +374,9 @@ function drawBaseTierColumn(
 
       const lblX = (x(pL.category) ?? 0) + acOffset + barW + 4;
       const lblY = yL;
-      const text = `${diff >= 0 ? "+" : "\u2212"}${formatNumber(Math.abs(diff), { decimals: cfg.decimals })} (${pct >= 0 ? "+" : "\u2212"}${Math.abs(pct).toFixed(0)}%)`;
+      const dAbs = cfg.decimalsAbs ?? cfg.decimals;
+      const dPct = cfg.decimalsPct ?? 0;
+      const text = `${diff >= 0 ? "+" : "\u2212"}${formatNumber(Math.abs(diff), { decimals: dAbs })} (${pct >= 0 ? "+" : "\u2212"}${Math.abs(pct).toFixed(dPct)}%)`;
       g.append("text")
         .attr("class", "first-last-delta-lbl")
         .attr("x", lblX)
@@ -510,7 +517,9 @@ function drawVarianceTierColumn(
     .text((d) => {
       const v = accessor(d);
       if (v == null) return "";
-      return mode === "abs" ? formatNumber(v, { decimals: cfg.decimals, negatives: "sign" }) : formatPercent(v, 0);
+      return mode === "abs"
+        ? formatNumber(v, { decimals: cfg.decimalsAbs ?? cfg.decimals, negatives: "sign" })
+        : formatPercent(v, cfg.decimalsPct ?? 0);
     });
 }
 
@@ -816,7 +825,9 @@ function drawVarianceTierBar(
     .text((d) => {
       const v = accessor(d);
       if (v == null) return "";
-      return mode === "abs" ? formatNumber(v, { decimals: cfg.decimals, negatives: "sign" }) : formatPercent(v, 0);
+      return mode === "abs"
+        ? formatNumber(v, { decimals: cfg.decimalsAbs ?? cfg.decimals, negatives: "sign" })
+        : formatPercent(v, cfg.decimalsPct ?? 0);
     });
 }
 
