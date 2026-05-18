@@ -104,6 +104,14 @@ export class Visual implements IVisual {
             sortBy: (this.formattingSettings.general.sortBy.value.value as ChartConfig["sortBy"]) ?? "category",
             sortDir: (this.formattingSettings.general.sortDir.value.value as ChartConfig["sortDir"]) ?? "desc",
             showFirstLastDelta: this.formattingSettings.general.showFirstLastDelta.value,
+            font: {
+                family: this.formattingSettings.text.font.fontFamily.value || "Segoe UI, sans-serif",
+                size: Math.max(6, Math.min(40, Math.round(this.formattingSettings.text.font.fontSize.value ?? 9))),
+                bold: this.formattingSettings.text.font.bold.value,
+                italic: this.formattingSettings.text.font.italic.value,
+                underline: this.formattingSettings.text.font.underline.value,
+                color: this.formattingSettings.text.color.value.value || "#333333"
+            },
             width: Math.max(80, options.viewport.width),
             height: Math.max(80, options.viewport.height),
             callbacks: {

@@ -42,6 +42,15 @@ export interface ChartConfig {
   sortDir: "asc" | "desc";
   /** Column orientation only: draw a line from the first AC bar top to the last AC bar top, with the delta to the right. */
   showFirstLastDelta: boolean;
+  /** Font/text styling applied to all labels, headers and axis text. */
+  font: {
+    family: string;
+    size: number;
+    bold: boolean;
+    italic: boolean;
+    underline: boolean;
+    color: string;
+  };
   width: number;
   height: number;
   callbacks?: ChartCallbacks;
@@ -51,16 +60,18 @@ export interface ChartData {
   points: CategoryPoint[];
 }
 
-const FONT = "'Segoe UI', sans-serif";
-const LABEL_SIZE = 11;
-const HEADER_SIZE = 11;
-const AXIS_SIZE = 11;
+const FONT_FALLBACK = "'Segoe UI', sans-serif";
 const TIER_GAP = 6;
 
 export function renderChart(svgEl: SVGSVGElement, data: ChartData, cfg: ChartConfig): void {
   const svg = d3.select(svgEl);
   svg.selectAll("*").remove();
-  svg.attr("font-family", FONT);
+  const family = cfg.font.family || FONT_FALLBACK;
+  svg.attr("font-family", family);
+  if (cfg.font.bold) svg.attr("font-weight", "bold");
+  if (cfg.font.italic) svg.attr("font-style", "italic");
+  if (cfg.font.underline) svg.attr("text-decoration", "underline");
+  svg.attr("fill", cfg.font.color);
 
   // Background click clears selection
   svg.on("click", function (event) {
@@ -77,7 +88,7 @@ export function renderChart(svgEl: SVGSVGElement, data: ChartData, cfg: ChartCon
       .attr("x", cfg.width / 2)
       .attr("y", cfg.height / 2)
       .attr("text-anchor", "middle")
-      .attr("font-size", LABEL_SIZE)
+      .attr("font-size", cfg.font.size)
       .attr("fill", "#666")
       .text("No data");
     return;
@@ -178,7 +189,7 @@ function renderColumn(
   const overflowing = cfg.enableScrollbar && n > cfg.maxVisibleCategories;
   const padL = 8;
   const padR = 12;
-  const axisH = AXIS_SIZE + 6;
+  const axisH = cfg.font.size + 6;
   const tierGapTotal = TIER_GAP * (numTiers(cfg) - 1);
   const hUsable = cfg.height - axisH - tierGapTotal - 14; // 14 = top space for headers
   // Tier order (top -> bottom): abs deviation, pct deviation (pin), base AC|scenario.
@@ -235,10 +246,10 @@ function renderColumn(
     .enter()
     .append("text")
     .attr("x", (d) => (x(d.category) ?? 0) + x.bandwidth() / 2)
-    .attr("y", AXIS_SIZE)
+    .attr("y", cfg.font.size)
     .attr("text-anchor", "middle")
-    .attr("font-size", AXIS_SIZE)
-    .attr("fill", "#333")
+    .attr("font-size", cfg.font.size)
+    .attr("fill", cfg.font.color)
     .text((d) => d.category);
   colLabels.append("title").text((d) => d.category);
   truncateTextEnd<CategoryPoint>(colLabels, () => x.bandwidth() + 2);
@@ -261,9 +272,9 @@ function drawBaseTierColumn(
     .attr("x", (x.range()[1] - x.range()[0]) / 2)
     .attr("y", -3)
     .attr("text-anchor", "middle")
-    .attr("font-size", HEADER_SIZE)
+    .attr("font-size", cfg.font.size)
     .attr("font-weight", "bold")
-    .attr("fill", "#333")
+    .attr("fill", cfg.font.color)
     .text(`AC | ${cfg.scenario}`);
 
   g.append("line")
@@ -314,10 +325,10 @@ function drawBaseTierColumn(
     .attr("class", "lbl-ac")
     .attr("data-cat", (d) => d.category)
     .attr("x", (d) => (x(d.category) ?? 0) + acOffset + barW / 2)
-    .attr("y", (d) => Math.max(LABEL_SIZE, y(d.actual ?? 0) - 2))
+    .attr("y", (d) => Math.max(cfg.font.size, y(d.actual ?? 0) - 2))
     .attr("text-anchor", "middle")
-    .attr("font-size", LABEL_SIZE)
-    .attr("fill", "#333")
+    .attr("font-size", cfg.font.size)
+    .attr("fill", cfg.font.color)
     .text((d) => (d.actual == null || Math.abs(y(d.actual) - y(0)) < 12 ? "" : formatNumber(d.actual, { decimals: cfg.decimals })));
 
   // First-to-last delta line (column orientation only)
@@ -358,7 +369,7 @@ function drawBaseTierColumn(
         .attr("y", lblY)
         .attr("dominant-baseline", "middle")
         .attr("text-anchor", "start")
-        .attr("font-size", LABEL_SIZE)
+        .attr("font-size", cfg.font.size)
         .attr("font-weight", "bold")
         .attr("fill", color)
         .text(text);
@@ -391,9 +402,9 @@ function drawVarianceTierColumn(
     .attr("x", (x.range()[1] - x.range()[0]) / 2)
     .attr("y", -3)
     .attr("text-anchor", "middle")
-    .attr("font-size", HEADER_SIZE)
+    .attr("font-size", cfg.font.size)
     .attr("font-weight", "bold")
-    .attr("fill", "#333")
+    .attr("fill", cfg.font.color)
     .text(mode === "abs" ? `Δ${cfg.scenario}` : `Δ${cfg.scenario}%`);
 
   g.append("line")
@@ -470,11 +481,11 @@ function drawVarianceTierColumn(
     .attr("y", (d) => {
       const v = accessor(d);
       if (v == null) return y(0);
-      return v >= 0 ? Math.max(LABEL_SIZE, y(v) - 2) : Math.min(h - 2, y(v) + LABEL_SIZE + 1);
+      return v >= 0 ? Math.max(cfg.font.size, y(v) - 2) : Math.min(h - 2, y(v) + cfg.font.size + 1);
     })
     .attr("text-anchor", "middle")
-    .attr("font-size", LABEL_SIZE)
-    .attr("fill", "#333")
+    .attr("font-size", cfg.font.size)
+    .attr("fill", cfg.font.color)
     .text((d) => {
       const v = accessor(d);
       if (v == null) return "";
@@ -528,8 +539,8 @@ function renderBar(
     .attr("y", (d) => (y(d.category) ?? 0) + y.bandwidth() / 2)
     .attr("dominant-baseline", "middle")
     .attr("text-anchor", "end")
-    .attr("font-size", AXIS_SIZE)
-    .attr("fill", "#333")
+    .attr("font-size", cfg.font.size)
+    .attr("fill", cfg.font.color)
     .text((d) => d.category);
   labels.append("title").text((d) => d.category);
   truncateTextEnd<CategoryPoint>(labels, () => axisW - 8);
@@ -581,7 +592,7 @@ function drawBaseTierBar(
   g.append("text")
     .attr("x", w / 2).attr("y", -8)
     .attr("text-anchor", "middle")
-    .attr("font-size", HEADER_SIZE).attr("font-weight", "bold").attr("fill", "#333")
+    .attr("font-size", cfg.font.size).attr("font-weight", "bold").attr("fill", cfg.font.color)
     .text(`AC | ${cfg.scenario}`);
 
   g.append("line")
@@ -634,8 +645,8 @@ function drawBaseTierBar(
     .attr("x", (d) => x(d.actual ?? 0) + 3)
     .attr("y", (d) => (y(d.category) ?? 0) + acOffset + barH / 2)
     .attr("dominant-baseline", "middle")
-    .attr("font-size", LABEL_SIZE)
-    .attr("fill", "#333")
+    .attr("font-size", cfg.font.size)
+    .attr("fill", cfg.font.color)
     .text((d) => (d.actual == null ? "" : formatNumber(d.actual, { decimals: cfg.decimals })));
 }
 
@@ -664,7 +675,7 @@ function drawVarianceTierBar(
     .attr("x", x(0))
     .attr("y", -8)
     .attr("text-anchor", "middle")
-    .attr("font-size", HEADER_SIZE).attr("font-weight", "bold").attr("fill", "#333")
+    .attr("font-size", cfg.font.size).attr("font-weight", "bold").attr("fill", cfg.font.color)
     .text(mode === "abs" ? `Δ${cfg.scenario}` : `Δ${cfg.scenario}%`);
 
   g.append("line")
@@ -752,8 +763,8 @@ function drawVarianceTierBar(
       if (v >= 0) return x(v) + 3 > w - 2 ? "end" : "start";
       return x(v) - 3 < 2 ? "start" : "end";
     })
-    .attr("font-size", LABEL_SIZE)
-    .attr("fill", "#333")
+    .attr("font-size", cfg.font.size)
+    .attr("fill", cfg.font.color)
     .text((d) => {
       const v = accessor(d);
       if (v == null) return "";

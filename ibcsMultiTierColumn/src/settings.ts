@@ -124,8 +124,39 @@ class ColorsCard extends FormattingSettingsCard {
     slices: Array<FormattingSettingsSlice> = [this.positive, this.negative, this.zero, this.acFill];
 }
 
+class TextCard extends FormattingSettingsCard {
+    font = new formattingSettings.FontControl({
+        name: "font",
+        displayName: "Font",
+        fontFamily: new formattingSettings.FontPicker({
+            name: "fontFamily",
+            displayName: "Font family",
+            value: "Segoe UI, sans-serif"
+        }),
+        fontSize: new formattingSettings.NumUpDown({
+            name: "fontSize",
+            displayName: "Font size",
+            value: 9
+        }),
+        bold: new formattingSettings.ToggleSwitch({ name: "bold", displayName: "Bold", value: false }),
+        italic: new formattingSettings.ToggleSwitch({ name: "italic", displayName: "Italic", value: false }),
+        underline: new formattingSettings.ToggleSwitch({ name: "underline", displayName: "Underline", value: false })
+    });
+
+    color = new formattingSettings.ColorPicker({
+        name: "color",
+        displayName: "Color",
+        value: { value: "#333333" }
+    });
+
+    name: string = "text";
+    displayName: string = "Text";
+    slices: Array<FormattingSettingsSlice> = [this.font, this.color];
+}
+
 export class VisualFormattingSettingsModel extends FormattingSettingsModel {
     general = new GeneralCard();
+    text = new TextCard();
     colors = new ColorsCard();
-    cards = [this.general, this.colors];
+    cards = [this.general, this.text, this.colors];
 }

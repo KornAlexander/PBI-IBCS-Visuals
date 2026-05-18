@@ -54,6 +54,16 @@
         "zero": { "type": { "fill": { "solid": { "color": true } } } },
         "acFill": { "type": { "fill": { "solid": { "color": true } } } }
       }
+    },
+    "text": {
+      "properties": {
+        "fontFamily": { "type": { "formatting": { "fontFamily": true } } },
+        "fontSize": { "type": { "formatting": { "fontSize": true } } },
+        "bold": { "type": { "bool": true } },
+        "italic": { "type": { "bool": true } },
+        "underline": { "type": { "bool": true } },
+        "color": { "type": { "fill": { "solid": { "color": true } } } }
+      }
     }
   },
   "dataViewMappings": [
