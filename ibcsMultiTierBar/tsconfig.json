@@ -1,0 +1,24 @@
+{
+    "compilerOptions": {
+        "allowJs": false,
+        "emitDecoratorMetadata": true,
+        "experimentalDecorators": true,
+        "target": "es2022",
+        "sourceMap": true,
+        "outDir": "./.tmp/build/",
+        "moduleResolution": "node",
+        "declaration": true,
+        "baseUrl": ".",
+        "paths": {
+            "@shared/*": ["../shared/src/*"]
+        },
+        "lib": [
+            "es2022",
+            "dom"
+        ]
+    },
+    "include": [
+        "./src/**/*.ts",
+        "../shared/src/**/*.ts"
+    ]
+}
