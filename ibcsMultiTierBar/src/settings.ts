@@ -13,7 +13,8 @@ class GeneralCard extends FormattingSettingsCard {
         items: [
             { value: "PY", displayName: "Previous Year (PY)" },
             { value: "PL", displayName: "Plan (PL)" },
-            { value: "BU", displayName: "Budget (BU)" }
+            { value: "BU", displayName: "Budget (BU)" },
+            { value: "FC", displayName: "Forecast (FC)" }
         ],
         value: { value: "PY", displayName: "Previous Year (PY)" }
     });
@@ -42,9 +43,30 @@ class GeneralCard extends FormattingSettingsCard {
         value: 0
     });
 
+    axisWidthPercent = new formattingSettings.NumUpDown({
+        name: "axisWidthPercent",
+        displayName: "Category axis width (%)",
+        value: 25
+    });
+
+    maxVisibleCategories = new formattingSettings.NumUpDown({
+        name: "maxVisibleCategories",
+        displayName: "Max visible categories (scroll above)",
+        value: 10
+    });
+
+    minBandPx = new formattingSettings.NumUpDown({
+        name: "minBandPx",
+        displayName: "Min row height (px)",
+        value: 28
+    });
+
     name: string = "general";
     displayName: string = "General";
-    slices: Array<FormattingSettingsSlice> = [this.scenario, this.invert, this.showAbsoluteTier, this.showPercentTier, this.decimals];
+    slices: Array<FormattingSettingsSlice> = [
+        this.scenario, this.invert, this.showAbsoluteTier, this.showPercentTier,
+        this.decimals, this.axisWidthPercent, this.maxVisibleCategories, this.minBandPx
+    ];
 }
 
 class ColorsCard extends FormattingSettingsCard {
@@ -52,7 +74,7 @@ class ColorsCard extends FormattingSettingsCard {
         name: "positive", displayName: "Positive variance", value: { value: "#7AB317" }
     });
     negative = new formattingSettings.ColorPicker({
-        name: "negative", displayName: "Negative variance", value: { value: "#DC2D2D" }
+        name: "negative", displayName: "Negative variance", value: { value: "#FF0000" }
     });
     zero = new formattingSettings.ColorPicker({
         name: "zero", displayName: "Zero variance", value: { value: "#8C8C8C" }

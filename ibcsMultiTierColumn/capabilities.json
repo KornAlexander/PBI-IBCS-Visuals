@@ -2,7 +2,7 @@
   "dataRoles": [
     { "displayName": "Category", "name": "category", "kind": "Grouping" },
     { "displayName": "Actual (AC)", "name": "actual", "kind": "Measure" },
-    { "displayName": "Reference (PY / PL / BU)", "name": "reference", "kind": "Measure" }
+    { "displayName": "Reference (PY / PL / BU / FC)", "name": "reference", "kind": "Measure" }
   ],
   "objects": {
     "general": {
@@ -12,14 +12,18 @@
             "enumeration": [
               { "value": "PY", "displayName": "Previous Year (PY)" },
               { "value": "PL", "displayName": "Plan (PL)" },
-              { "value": "BU", "displayName": "Budget (BU)" }
+              { "value": "BU", "displayName": "Budget (BU)" },
+              { "value": "FC", "displayName": "Forecast (FC)" }
             ]
           }
         },
         "invert": { "type": { "bool": true } },
         "showAbsoluteTier": { "type": { "bool": true } },
         "showPercentTier": { "type": { "bool": true } },
-        "decimals": { "type": { "numeric": true } }
+        "decimals": { "type": { "numeric": true } },
+        "axisWidthPercent": { "type": { "numeric": true } },
+        "maxVisibleCategories": { "type": { "numeric": true } },
+        "minBandPx": { "type": { "numeric": true } }
       }
     },
     "colors": {

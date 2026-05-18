@@ -8,6 +8,7 @@ yarn-error.log*
 .tmp/
 dist/
 *.pbiviz
+!releases/*.pbiviz
 *.log
 webpack.statistics.*.html
 

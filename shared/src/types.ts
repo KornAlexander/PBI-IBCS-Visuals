@@ -1,4 +1,4 @@
-export type Scenario = "AC" | "PY" | "PL" | "BU";
+export type Scenario = "AC" | "PY" | "PL" | "BU" | "FC";
 
 export interface CategoryPoint {
   category: string;

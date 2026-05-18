@@ -22,16 +22,21 @@ export class Visual implements IVisual {
     private formattingSettings: VisualFormattingSettingsModel;
     private formattingSettingsService: FormattingSettingsService;
 
+    private scrollWrap: HTMLDivElement;
+
     constructor(options: VisualConstructorOptions) {
         this.host = options.host;
         this.target = options.element;
         this.target.style.overflow = "hidden";
         this.formattingSettingsService = new FormattingSettingsService();
 
+        const wrap = document.createElement("div");
+        wrap.style.cssText = "width:100%;height:100%;overflow:auto;";
+        this.target.appendChild(wrap);
+        this.scrollWrap = wrap;
+
         const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-        svg.setAttribute("width", "100%");
-        svg.setAttribute("height", "100%");
-        this.target.appendChild(svg);
+        wrap.appendChild(svg);
         this.svg = svg;
     }
 
@@ -53,6 +58,9 @@ export class Visual implements IVisual {
                 zero: this.formattingSettings.colors.zero.value.value || PALETTE.zero,
                 acFill: this.formattingSettings.colors.acFill.value.value || PALETTE.acFill
             },
+            axisWidthPercent: clamp(this.formattingSettings.general.axisWidthPercent.value ?? 25, 5, 60),
+            maxVisibleCategories: Math.max(1, Math.round(this.formattingSettings.general.maxVisibleCategories.value ?? 10)),
+            minBandPx: Math.max(8, Math.round(this.formattingSettings.general.minBandPx.value ?? 28)),
             width: Math.max(80, options.viewport.width),
             height: Math.max(80, options.viewport.height)
         };
@@ -86,4 +94,8 @@ function toNum(v: powerbi.PrimitiveValue | null | undefined): number | null {
     if (v == null) return null;
     const n = typeof v === "number" ? v : Number(v);
     return isFinite(n) ? n : null;
+}
+
+function clamp(v: number, lo: number, hi: number): number {
+    return Math.max(lo, Math.min(hi, v));
 }
