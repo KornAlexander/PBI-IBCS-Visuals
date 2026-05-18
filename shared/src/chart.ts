@@ -172,10 +172,17 @@ function renderColumn(
   drawBaseTierColumn(baseG, points, x, tierH[0], cfg);
   yOff += tierH[0];
 
+  // Pixels-per-unit of the base value scale (after .nice()), shared with abs variance tier.
+  const baseVals = points.flatMap((p) => [p.actual ?? 0, p.reference ?? 0]);
+  const bMax = d3.max(baseVals) ?? 1;
+  const bMin = Math.min(0, d3.min(baseVals) ?? 0);
+  const nicedDomain = d3.scaleLinear().domain([bMin, bMax]).nice().domain();
+  const basePPU = tierH[0] / ((nicedDomain[1] - nicedDomain[0]) || 1);
+
   if (cfg.showAbsoluteTier) {
     yOff += TIER_GAP;
     const g = svg.append("g").attr("transform", `translate(${padL},${yOff})`);
-    drawVarianceTierColumn(g, variance, x, tierH[1], cfg, "abs");
+    drawVarianceTierColumn(g, variance, x, tierH[1], cfg, "abs", basePPU);
     yOff += tierH[1];
   }
   if (cfg.showPercentTier) {
@@ -285,12 +292,19 @@ function drawVarianceTierColumn(
   x: d3.ScaleBand<string>,
   h: number,
   cfg: ChartConfig,
-  mode: "abs" | "pct"
+  mode: "abs" | "pct",
+  sharedPPU?: number
 ) {
   const accessor = (v: VariancePoint) => (mode === "abs" ? v.absolute : v.percent);
   const vals = variance.map(accessor).filter((v): v is number => v != null);
-  const m = Math.max(Math.abs(d3.min(vals) ?? 0), Math.abs(d3.max(vals) ?? 0)) || 1;
-  const y = d3.scaleLinear().domain([-m, m]).range([h, 0]);
+  let y: d3.ScaleLinear<number, number>;
+  if (mode === "abs" && sharedPPU && sharedPPU > 0) {
+    const half = h / 2;
+    y = d3.scaleLinear().domain([-1, 1]).range([half + sharedPPU, half - sharedPPU]);
+  } else {
+    const m = Math.max(Math.abs(d3.min(vals) ?? 0), Math.abs(d3.max(vals) ?? 0)) || 1;
+    y = d3.scaleLinear().domain([-m, m]).range([h, 0]);
+  }
 
   // Header centered horizontally above the tier (i.e., over the chart middle)
   g.append("text")
@@ -443,10 +457,17 @@ function renderBar(
   drawBaseTierBar(baseG, points, y, widths[0], cfg);
   xOff += widths[0];
 
+  // Pixels-per-unit of the base value scale (after .nice()), shared with abs variance tier.
+  const baseVals = points.flatMap((p) => [p.actual ?? 0, p.reference ?? 0]);
+  const bMax = d3.max(baseVals) ?? 1;
+  const bMin = Math.min(0, d3.min(baseVals) ?? 0);
+  const nicedDomain = d3.scaleLinear().domain([bMin, bMax]).nice().domain();
+  const basePPU = widths[0] / ((nicedDomain[1] - nicedDomain[0]) || 1);
+
   if (cfg.showAbsoluteTier) {
     xOff += TIER_GAP;
     const g = svg.append("g").attr("transform", `translate(${xOff},${padTop})`);
-    drawVarianceTierBar(g, variance, y, widths[1], cfg, "abs");
+    drawVarianceTierBar(g, variance, y, widths[1], cfg, "abs", basePPU);
     xOff += widths[1];
   }
   if (cfg.showPercentTier) {
@@ -536,12 +557,19 @@ function drawVarianceTierBar(
   y: d3.ScaleBand<string>,
   w: number,
   cfg: ChartConfig,
-  mode: "abs" | "pct"
+  mode: "abs" | "pct",
+  sharedPPU?: number
 ) {
   const accessor = (v: VariancePoint) => (mode === "abs" ? v.absolute : v.percent);
   const vals = variance.map(accessor).filter((v): v is number => v != null);
-  const m = Math.max(Math.abs(d3.min(vals) ?? 0), Math.abs(d3.max(vals) ?? 0)) || 1;
-  const x = d3.scaleLinear().domain([-m, m]).range([0, w]);
+  let x: d3.ScaleLinear<number, number>;
+  if (mode === "abs" && sharedPPU && sharedPPU > 0) {
+    const half = w / 2;
+    x = d3.scaleLinear().domain([-1, 1]).range([half - sharedPPU, half + sharedPPU]);
+  } else {
+    const m = Math.max(Math.abs(d3.min(vals) ?? 0), Math.abs(d3.max(vals) ?? 0)) || 1;
+    x = d3.scaleLinear().domain([-m, m]).range([0, w]);
+  }
 
   // Header centered on the zero line (middle of the tier since extent is symmetric)
   g.append("text")
