@@ -17,6 +17,9 @@
             "dom"
         ]
     },
+    "files": [
+        "./src/visual.ts"
+    ],
     "include": [
         "./src/**/*.ts",
         "../shared/src/**/*.ts"
