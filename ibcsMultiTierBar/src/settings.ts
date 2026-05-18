@@ -1,6 +1,7 @@
 "use strict";
 
 import { formattingSettings } from "powerbi-visuals-utils-formattingmodel";
+import { VISUAL_VERSION } from "./version";
 
 import FormattingSettingsCard = formattingSettings.SimpleCard;
 import FormattingSettingsSlice = formattingSettings.Slice;
@@ -167,9 +168,22 @@ class TextCard extends FormattingSettingsCard {
     slices: Array<FormattingSettingsSlice> = [this.font, this.color];
 }
 
+class AboutCard extends FormattingSettingsCard {
+    version = new formattingSettings.ReadOnlyText({
+        name: "version",
+        displayName: "Version",
+        value: VISUAL_VERSION
+    });
+
+    name: string = "about";
+    displayName: string = "About";
+    slices: Array<FormattingSettingsSlice> = [this.version];
+}
+
 export class VisualFormattingSettingsModel extends FormattingSettingsModel {
     general = new GeneralCard();
     text = new TextCard();
     colors = new ColorsCard();
-    cards = [this.general, this.text, this.colors];
+    about = new AboutCard();
+    cards = [this.general, this.text, this.colors, this.about];
 }

@@ -66,6 +66,11 @@
         "underline": { "type": { "bool": true } },
         "color": { "type": { "fill": { "solid": { "color": true } } } }
       }
+    },
+    "about": {
+      "properties": {
+        "version": { "type": { "text": true } }
+      }
     }
   },
   "dataViewMappings": [
