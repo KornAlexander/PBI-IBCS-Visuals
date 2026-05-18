@@ -13,7 +13,16 @@ import { VisualFormattingSettingsModel } from "./settings";
 import { renderChart, PALETTE, ChartConfig, ChartData, Orientation } from "../../shared/src/chart";
 import { CategoryPoint, Scenario } from "../../shared/src/types";
 
+import ISelectionId = powerbi.visuals.ISelectionId;
+import ISelectionManager = powerbi.extensibility.ISelectionManager;
+import ITooltipService = powerbi.extensibility.ITooltipService;
+import VisualTooltipDataItem = powerbi.extensibility.VisualTooltipDataItem;
+
 const ORIENTATION: Orientation = "bar";
+
+interface PointWithId extends CategoryPoint {
+    selectionId: ISelectionId;
+}
 
 export class Visual implements IVisual {
     private host: powerbi.extensibility.visual.IVisualHost;
@@ -23,12 +32,20 @@ export class Visual implements IVisual {
     private formattingSettingsService: FormattingSettingsService;
 
     private scrollWrap: HTMLDivElement;
+    private selectionManager: ISelectionManager;
+    private tooltipService: ITooltipService;
+    private selectionIdByCategory: Map<string, ISelectionId> = new Map();
+    private pointsByCategory: Map<string, CategoryPoint> = new Map();
+    private lastOptions?: VisualUpdateOptions;
 
     constructor(options: VisualConstructorOptions) {
         this.host = options.host;
         this.target = options.element;
         this.target.style.overflow = "hidden";
         this.formattingSettingsService = new FormattingSettingsService();
+        this.selectionManager = options.host.createSelectionManager();
+        this.tooltipService = options.host.tooltipService;
+        this.selectionManager.registerOnSelectCallback(() => this.rerender());
 
         const wrap = document.createElement("div");
         wrap.style.cssText = "width:100%;height:100%;overflow:auto;";
@@ -41,10 +58,32 @@ export class Visual implements IVisual {
     }
 
     public update(options: VisualUpdateOptions): void {
+        this.lastOptions = options;
         const dv = options.dataViews && options.dataViews[0];
         this.formattingSettings = this.formattingSettingsService.populateFormattingSettingsModel(VisualFormattingSettingsModel, dv);
 
-        const points = extractPoints(dv);
+        const points = this.extractPointsWithIds(dv);
+        this.pointsByCategory.clear();
+        this.selectionIdByCategory.clear();
+        for (const p of points) {
+            this.pointsByCategory.set(p.category, { category: p.category, actual: p.actual, reference: p.reference });
+            this.selectionIdByCategory.set(p.category, p.selectionId);
+        }
+
+        this.render();
+    }
+
+    private render(): void {
+        if (!this.lastOptions) return;
+        const options = this.lastOptions;
+        const selectedIds = this.selectionManager.getSelectionIds() as ISelectionId[];
+        const selectedCategories = new Set<string>();
+        for (const [cat, id] of this.selectionIdByCategory) {
+            if (selectedIds.some((s) => (s as { equals: (o: ISelectionId) => boolean }).equals(id))) {
+                selectedCategories.add(cat);
+            }
+        }
+
         const cfg: ChartConfig = {
             orientation: ORIENTATION,
             scenario: (this.formattingSettings.general.scenario.value.value as Exclude<Scenario, "AC">) ?? "PY",
@@ -62,11 +101,67 @@ export class Visual implements IVisual {
             maxVisibleCategories: Math.max(1, Math.round(this.formattingSettings.general.maxVisibleCategories.value ?? 10)),
             minBandPx: Math.max(8, Math.round(this.formattingSettings.general.minBandPx.value ?? 28)),
             width: Math.max(80, options.viewport.width),
-            height: Math.max(80, options.viewport.height)
+            height: Math.max(80, options.viewport.height),
+            callbacks: {
+                onPointClick: (cat, ev) => this.onPointClick(cat, ev),
+                onPointHover: (cat, ev) => this.onPointHover(cat, ev),
+                onPointLeave: () => this.tooltipService.hide({ immediately: false, isTouchEvent: false }),
+                onBackgroundClick: () => { this.selectionManager.clear(); this.render(); },
+                selectedCategories
+            }
         };
 
-        const data: ChartData = { points };
+        const data: ChartData = { points: Array.from(this.pointsByCategory.values()) };
         renderChart(this.svg, data, cfg);
+    }
+
+    private rerender(): void { this.render(); }
+
+    private onPointClick(category: string, ev: MouseEvent): void {
+        const id = this.selectionIdByCategory.get(category);
+        if (!id) return;
+        this.selectionManager.select(id, ev.ctrlKey || ev.metaKey || ev.shiftKey).then(() => this.render());
+    }
+
+    private onPointHover(category: string, ev: MouseEvent): void {
+        const p = this.pointsByCategory.get(category);
+        if (!p) return;
+        const scenario = this.formattingSettings.general.scenario.value.value as string;
+        const items: VisualTooltipDataItem[] = [
+            { displayName: "Category", value: String(category) },
+            { displayName: "AC", value: p.actual == null ? "—" : String(p.actual) },
+            { displayName: scenario, value: p.reference == null ? "—" : String(p.reference) }
+        ];
+        if (p.actual != null && p.reference != null) {
+            const diff = p.actual - p.reference;
+            const pct = p.reference !== 0 ? (diff / Math.abs(p.reference)) * 100 : 0;
+            items.push({ displayName: `Δ${scenario}`, value: (diff >= 0 ? "+" : "") + String(diff) });
+            items.push({ displayName: `Δ${scenario}%`, value: (pct >= 0 ? "+" : "") + pct.toFixed(1) + "%" });
+        }
+        const id = this.selectionIdByCategory.get(category);
+        this.tooltipService.show({
+            coordinates: [ev.clientX, ev.clientY],
+            dataItems: items,
+            identities: id ? [id] : [],
+            isTouchEvent: false
+        });
+    }
+
+    private extractPointsWithIds(dv: DataView | undefined): PointWithId[] {
+        if (!dv || !dv.categorical) return [];
+        const cat = dv.categorical.categories && dv.categorical.categories[0];
+        const vals = dv.categorical.values;
+        if (!cat || !vals || vals.length === 0) return [];
+
+        const actualSeries = vals.find((v) => v.source.roles && v.source.roles["actual"]);
+        const refSeries = vals.find((v) => v.source.roles && v.source.roles["reference"]);
+
+        return cat.values.map((c, i) => ({
+            category: c == null ? "" : String(c),
+            actual: actualSeries ? toNum(actualSeries.values[i]) : null,
+            reference: refSeries ? toNum(refSeries.values[i]) : null,
+            selectionId: this.host.createSelectionIdBuilder().withCategory(cat, i).createSelectionId()
+        }));
     }
 
     public getFormattingModel(): powerbi.visuals.FormattingModel {

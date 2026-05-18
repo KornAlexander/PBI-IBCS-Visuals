@@ -6,6 +6,15 @@ import { formatNumber, formatPercent } from "./numberFormat";
 
 export type Orientation = "column" | "bar";
 
+export interface ChartCallbacks {
+  onPointClick?: (category: string, event: MouseEvent) => void;
+  onPointHover?: (category: string, event: MouseEvent) => void;
+  onPointLeave?: () => void;
+  onBackgroundClick?: () => void;
+  /** Categories currently selected; non-selected get dimmed. Empty = none selected (all full opacity). */
+  selectedCategories?: Set<string>;
+}
+
 export interface ChartConfig {
   orientation: Orientation;
   scenario: Exclude<Scenario, "AC">;
@@ -27,6 +36,7 @@ export interface ChartConfig {
   minBandPx: number;
   width: number;
   height: number;
+  callbacks?: ChartCallbacks;
 }
 
 export interface ChartData {
@@ -43,6 +53,11 @@ export function renderChart(svgEl: SVGSVGElement, data: ChartData, cfg: ChartCon
   const svg = d3.select(svgEl);
   svg.selectAll("*").remove();
   svg.attr("font-family", FONT);
+
+  // Background click clears selection
+  svg.on("click", function (event) {
+    if (event.target === this) cfg.callbacks?.onBackgroundClick?.();
+  });
 
   defs(svg);
 
@@ -67,6 +82,20 @@ export function renderChart(svgEl: SVGSVGElement, data: ChartData, cfg: ChartCon
   } else {
     renderBar(svg, points, variance, cfg);
   }
+
+  applySelectionDimming(svg, cfg);
+}
+
+function applySelectionDimming(
+  svg: d3.Selection<SVGSVGElement, unknown, null, undefined>,
+  cfg: ChartConfig
+) {
+  const sel = cfg.callbacks?.selectedCategories;
+  if (!sel || sel.size === 0) return;
+  svg.selectAll<SVGGraphicsElement, unknown>("[data-cat]").attr("opacity", function () {
+    const cat = (this as SVGGraphicsElement).getAttribute("data-cat") ?? "";
+    return sel.has(cat) ? 1 : 0.35;
+  });
 }
 
 function defs(svg: d3.Selection<SVGSVGElement, unknown, null, undefined>) {
@@ -178,40 +207,47 @@ function drawBaseTierColumn(
 
   const refStyle = getScenarioStyle(cfg.scenario, cfg.colors.acFill);
   const band = x.bandwidth();
-  const acBandRatio = 0.55; // AC narrower & centered in front of ref
-  const acW = band * acBandRatio;
-  const acOffset = (band - acW) / 2;
+  // Same-size overlap: both bars same width, shifted horizontally
+  const barW = band * 0.7;
+  const refOffset = 0;
+  const acOffset = band - barW;
 
-  // Reference (full band, behind)
+  // Reference (left, behind)
   g.selectAll(".bar-ref")
     .data(points).enter()
     .append("rect")
     .attr("class", "bar-ref")
-    .attr("x", (d) => x(d.category) ?? 0)
+    .attr("data-cat", (d) => d.category)
+    .attr("x", (d) => (x(d.category) ?? 0) + refOffset)
     .attr("y", (d) => y(Math.max(0, d.reference ?? 0)))
-    .attr("width", band)
+    .attr("width", barW)
     .attr("height", (d) => Math.abs(y(d.reference ?? 0) - y(0)))
     .attr("fill", refStyle.patternId ? `url(#${refStyle.patternId})` : refStyle.fill)
     .attr("stroke", refStyle.stroke)
     .attr("stroke-width", refStyle.strokeWidth);
 
-  // AC (narrower, on top)
+  // AC (right, on top, same size)
   g.selectAll(".bar-ac")
     .data(points).enter()
     .append("rect")
     .attr("class", "bar-ac")
+    .attr("data-cat", (d) => d.category)
     .attr("x", (d) => (x(d.category) ?? 0) + acOffset)
     .attr("y", (d) => y(Math.max(0, d.actual ?? 0)))
-    .attr("width", acW)
+    .attr("width", barW)
     .attr("height", (d) => Math.abs(y(d.actual ?? 0) - y(0)))
-    .attr("fill", cfg.colors.acFill);
+    .attr("fill", cfg.colors.acFill)
+    .style("cursor", "pointer");
+
+  attachInteractivity(g, cfg);
 
   // AC value labels
   g.selectAll(".lbl-ac")
     .data(points).enter()
     .append("text")
     .attr("class", "lbl-ac")
-    .attr("x", (d) => (x(d.category) ?? 0) + band / 2)
+    .attr("data-cat", (d) => d.category)
+    .attr("x", (d) => (x(d.category) ?? 0) + acOffset + barW / 2)
     .attr("y", (d) => Math.max(LABEL_SIZE, y(d.actual ?? 0) - 2))
     .attr("text-anchor", "middle")
     .attr("font-size", LABEL_SIZE)
@@ -252,6 +288,7 @@ function drawVarianceTierColumn(
     .data(variance).enter()
     .append("rect")
     .attr("class", "var")
+    .attr("data-cat", (d) => d.category)
     .attr("x", (d) => x(d.category) ?? 0)
     .attr("y", (d) => {
       const v = accessor(d);
@@ -262,12 +299,16 @@ function drawVarianceTierColumn(
       const v = accessor(d);
       return v == null ? 0 : Math.abs(y(v) - y(0));
     })
-    .attr("fill", (d) => colorForVariance(accessor(d), cfg));
+    .attr("fill", (d) => colorForVariance(accessor(d), cfg))
+    .style("cursor", "pointer");
+
+  attachInteractivity(g, cfg);
 
   g.selectAll(".lbl")
     .data(variance).enter()
     .append("text")
     .attr("class", "lbl")
+    .attr("data-cat", (d) => d.category)
     .attr("x", (d) => (x(d.category) ?? 0) + band / 2)
     .attr("y", (d) => {
       const v = accessor(d);
@@ -280,7 +321,7 @@ function drawVarianceTierColumn(
     .text((d) => {
       const v = accessor(d);
       if (v == null) return "";
-      return mode === "abs" ? formatNumber(v, { decimals: cfg.decimals }) : formatPercent(v, 0);
+      return mode === "abs" ? formatNumber(v, { decimals: cfg.decimals, negatives: "sign" }) : formatPercent(v, 0);
     });
 }
 
@@ -383,41 +424,48 @@ function drawBaseTierBar(
 
   const refStyle = getScenarioStyle(cfg.scenario, cfg.colors.acFill);
   const band = y.bandwidth();
-  const acBandRatio = 0.55;
-  const acH = band * acBandRatio;
-  const acOffset = (band - acH) / 2;
+  // Same-size overlap: both bars are barH high, offset vertically so both edges visible.
+  const barH = band * 0.7;
+  const refOffset = 0;
+  const acOffset = band - barH;
 
-  // Reference (full row, behind)
+  // Reference (top, behind)
   g.selectAll(".bar-ref")
     .data(points).enter()
     .append("rect")
     .attr("class", "bar-ref")
+    .attr("data-cat", (d) => d.category)
     .attr("x", (d) => Math.min(x(0), x(d.reference ?? 0)))
-    .attr("y", (d) => y(d.category) ?? 0)
+    .attr("y", (d) => (y(d.category) ?? 0) + refOffset)
     .attr("width", (d) => Math.abs(x(d.reference ?? 0) - x(0)))
-    .attr("height", band)
+    .attr("height", barH)
     .attr("fill", refStyle.patternId ? `url(#${refStyle.patternId})` : refStyle.fill)
     .attr("stroke", refStyle.stroke)
     .attr("stroke-width", refStyle.strokeWidth);
 
-  // AC (narrower, centered, on top)
+  // AC (bottom, on top, same size)
   g.selectAll(".bar-ac")
     .data(points).enter()
     .append("rect")
     .attr("class", "bar-ac")
+    .attr("data-cat", (d) => d.category)
     .attr("x", (d) => Math.min(x(0), x(d.actual ?? 0)))
     .attr("y", (d) => (y(d.category) ?? 0) + acOffset)
     .attr("width", (d) => Math.abs(x(d.actual ?? 0) - x(0)))
-    .attr("height", acH)
-    .attr("fill", cfg.colors.acFill);
+    .attr("height", barH)
+    .attr("fill", cfg.colors.acFill)
+    .style("cursor", "pointer");
+
+  attachInteractivity(g, cfg);
 
   // AC labels (at end of bar)
   g.selectAll(".lbl-ac")
     .data(points).enter()
     .append("text")
     .attr("class", "lbl-ac")
+    .attr("data-cat", (d) => d.category)
     .attr("x", (d) => x(d.actual ?? 0) + 3)
-    .attr("y", (d) => (y(d.category) ?? 0) + band / 2)
+    .attr("y", (d) => (y(d.category) ?? 0) + acOffset + barH / 2)
     .attr("dominant-baseline", "middle")
     .attr("font-size", LABEL_SIZE)
     .attr("fill", "#333")
@@ -455,6 +503,7 @@ function drawVarianceTierBar(
     .data(variance).enter()
     .append("rect")
     .attr("class", "var")
+    .attr("data-cat", (d) => d.category)
     .attr("x", (d) => {
       const v = accessor(d);
       if (v == null) return x(0);
@@ -466,12 +515,16 @@ function drawVarianceTierBar(
       return v == null ? 0 : Math.abs(x(v) - x(0));
     })
     .attr("height", band)
-    .attr("fill", (d) => colorForVariance(accessor(d), cfg));
+    .attr("fill", (d) => colorForVariance(accessor(d), cfg))
+    .style("cursor", "pointer");
+
+  attachInteractivity(g, cfg);
 
   g.selectAll(".lbl")
     .data(variance).enter()
     .append("text")
     .attr("class", "lbl")
+    .attr("data-cat", (d) => d.category)
     .attr("x", (d) => {
       const v = accessor(d);
       if (v == null) return x(0);
@@ -488,11 +541,32 @@ function drawVarianceTierBar(
     .text((d) => {
       const v = accessor(d);
       if (v == null) return "";
-      return mode === "abs" ? formatNumber(v, { decimals: cfg.decimals }) : formatPercent(v, 0);
+      return mode === "abs" ? formatNumber(v, { decimals: cfg.decimals, negatives: "sign" }) : formatPercent(v, 0);
     });
 }
 
 /* --------------------------------------------------------------- helpers */
+
+function attachInteractivity(
+  g: d3.Selection<SVGGElement, unknown, null, undefined>,
+  cfg: ChartConfig
+) {
+  const cb = cfg.callbacks;
+  if (!cb) return;
+  g.selectAll<SVGGraphicsElement, { category?: string }>("[data-cat]")
+    .on("click", function (event) {
+      event.stopPropagation();
+      const cat = (this as SVGGraphicsElement).getAttribute("data-cat") ?? "";
+      cb.onPointClick?.(cat, event as MouseEvent);
+    })
+    .on("mousemove", function (event) {
+      const cat = (this as SVGGraphicsElement).getAttribute("data-cat") ?? "";
+      cb.onPointHover?.(cat, event as MouseEvent);
+    })
+    .on("mouseleave", function () {
+      cb.onPointLeave?.();
+    });
+}
 
 function numTiers(cfg: ChartConfig): number {
   return 1 + (cfg.showAbsoluteTier ? 1 : 0) + (cfg.showPercentTier ? 1 : 0);
