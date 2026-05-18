@@ -126,6 +126,10 @@ export class Visual implements IVisual {
         };
 
         const data: ChartData = { points: Array.from(this.pointsByCategory.values()) };
+        this.target.style.width = cfg.width + "px";
+        this.target.style.height = cfg.height + "px";
+        this.scrollWrap.style.width = cfg.width + "px";
+        this.scrollWrap.style.height = cfg.height + "px";
         this.scrollWrap.style.overflowX = cfg.enableScrollbar ? "auto" : "hidden";
         this.scrollWrap.style.overflowY = "hidden";
         renderChart(this.svg, data, cfg);

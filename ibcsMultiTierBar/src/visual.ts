@@ -126,6 +126,12 @@ export class Visual implements IVisual {
         };
 
         const data: ChartData = { points: Array.from(this.pointsByCategory.values()) };
+        // Explicit pixel sizing so overflow:auto reliably produces a scrollbar — relying on
+        // height:100% can collapse to 0 when the host's target has no enforced height.
+        this.target.style.width = cfg.width + "px";
+        this.target.style.height = cfg.height + "px";
+        this.scrollWrap.style.width = cfg.width + "px";
+        this.scrollWrap.style.height = cfg.height + "px";
         this.scrollWrap.style.overflowY = cfg.enableScrollbar ? "auto" : "hidden";
         this.scrollWrap.style.overflowX = "hidden";
         renderChart(this.svg, data, cfg);
