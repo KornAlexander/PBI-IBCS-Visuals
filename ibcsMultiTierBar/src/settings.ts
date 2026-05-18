@@ -55,6 +55,12 @@ class GeneralCard extends FormattingSettingsCard {
         value: 10
     });
 
+    enableScrollbar = new formattingSettings.ToggleSwitch({
+        name: "enableScrollbar",
+        displayName: "Enable scrollbar",
+        value: true
+    });
+
     minBandPx = new formattingSettings.NumUpDown({
         name: "minBandPx",
         displayName: "Min row height (px)",
@@ -65,7 +71,7 @@ class GeneralCard extends FormattingSettingsCard {
     displayName: string = "General";
     slices: Array<FormattingSettingsSlice> = [
         this.scenario, this.invert, this.showAbsoluteTier, this.showPercentTier,
-        this.decimals, this.axisWidthPercent, this.maxVisibleCategories, this.minBandPx
+        this.decimals, this.axisWidthPercent, this.maxVisibleCategories, this.enableScrollbar, this.minBandPx
     ];
 }
 

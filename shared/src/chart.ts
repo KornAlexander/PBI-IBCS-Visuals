@@ -32,6 +32,8 @@ export interface ChartConfig {
   axisWidthPercent: number;
   /** Max number of categories to render before adding a scrollbar. */
   maxVisibleCategories: number;
+  /** When false, items always shrink to fit; no scrollbar even if count exceeds maxVisibleCategories. */
+  enableScrollbar: boolean;
   /** Per-category band size in pixels when scrolling (bar = row height; column = column width). */
   minBandPx: number;
   width: number;
@@ -144,7 +146,7 @@ function renderColumn(
   // Decide whether to scroll horizontally. Per-band min width = minBandPx; if data
   // exceeds maxVisibleCategories the SVG grows beyond viewport width.
   const n = points.length;
-  const overflowing = n > cfg.maxVisibleCategories;
+  const overflowing = cfg.enableScrollbar && n > cfg.maxVisibleCategories;
   const padL = 8;
   const padR = 12;
   const axisH = AXIS_SIZE + 6;
@@ -406,7 +408,7 @@ function renderBar(
   cfg: ChartConfig
 ) {
   const n = points.length;
-  const overflowing = n > cfg.maxVisibleCategories;
+  const overflowing = cfg.enableScrollbar && n > cfg.maxVisibleCategories;
   const padTop = 22;
   const padBottom = 6;
 

@@ -98,8 +98,7 @@ export class Visual implements IVisual {
                 acFill: this.formattingSettings.colors.acFill.value.value || PALETTE.acFill
             },
             axisWidthPercent: clamp(this.formattingSettings.general.axisWidthPercent.value ?? 25, 5, 60),
-            maxVisibleCategories: Math.max(1, Math.round(this.formattingSettings.general.maxVisibleCategories.value ?? 10)),
-            minBandPx: Math.max(8, Math.round(this.formattingSettings.general.minBandPx.value ?? 28)),
+            maxVisibleCategories: Math.max(1, Math.round(this.formattingSettings.general.maxVisibleCategories.value ?? 10)),            enableScrollbar: this.formattingSettings.general.enableScrollbar.value,            minBandPx: Math.max(8, Math.round(this.formattingSettings.general.minBandPx.value ?? 28)),
             width: Math.max(80, options.viewport.width),
             height: Math.max(80, options.viewport.height),
             callbacks: {
@@ -112,6 +111,7 @@ export class Visual implements IVisual {
         };
 
         const data: ChartData = { points: Array.from(this.pointsByCategory.values()) };
+        this.scrollWrap.style.overflow = cfg.enableScrollbar ? "auto" : "hidden";
         renderChart(this.svg, data, cfg);
     }
 

@@ -23,6 +23,7 @@
         "decimals": { "type": { "numeric": true } },
         "axisWidthPercent": { "type": { "numeric": true } },
         "maxVisibleCategories": { "type": { "numeric": true } },
+        "enableScrollbar": { "type": { "bool": true } },
         "minBandPx": { "type": { "numeric": true } }
       }
     },
