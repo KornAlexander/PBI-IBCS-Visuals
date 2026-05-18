@@ -61,6 +61,35 @@ class GeneralCard extends FormattingSettingsCard {
         value: true
     });
 
+    sortBy = new formattingSettings.ItemDropdown({
+        name: "sortBy",
+        displayName: "Sort by",
+        items: [
+            { value: "category", displayName: "Category" },
+            { value: "actual", displayName: "Actual" },
+            { value: "reference", displayName: "Reference" },
+            { value: "variance", displayName: "Δ Absolute" },
+            { value: "variancePct", displayName: "Δ Percent" }
+        ],
+        value: { value: "category", displayName: "Category" }
+    });
+
+    sortDir = new formattingSettings.ItemDropdown({
+        name: "sortDir",
+        displayName: "Sort direction",
+        items: [
+            { value: "asc", displayName: "Ascending" },
+            { value: "desc", displayName: "Descending" }
+        ],
+        value: { value: "desc", displayName: "Descending" }
+    });
+
+    showFirstLastDelta = new formattingSettings.ToggleSwitch({
+        name: "showFirstLastDelta",
+        displayName: "Show first→last delta",
+        value: false
+    });
+
     minBandPx = new formattingSettings.NumUpDown({
         name: "minBandPx",
         displayName: "Min row height (px)",
@@ -71,7 +100,8 @@ class GeneralCard extends FormattingSettingsCard {
     displayName: string = "General";
     slices: Array<FormattingSettingsSlice> = [
         this.scenario, this.invert, this.showAbsoluteTier, this.showPercentTier,
-        this.decimals, this.axisWidthPercent, this.maxVisibleCategories, this.enableScrollbar, this.minBandPx
+        this.decimals, this.axisWidthPercent, this.maxVisibleCategories, this.enableScrollbar,
+        this.sortBy, this.sortDir, this.showFirstLastDelta, this.minBandPx
     ];
 }
 

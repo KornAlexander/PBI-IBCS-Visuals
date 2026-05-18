@@ -36,6 +36,12 @@ export interface ChartConfig {
   enableScrollbar: boolean;
   /** Per-category band size in pixels when scrolling (bar = row height; column = column width). */
   minBandPx: number;
+  /** Sort categories by which field. */
+  sortBy: "category" | "actual" | "reference" | "variance" | "variancePct";
+  /** Sort direction. */
+  sortDir: "asc" | "desc";
+  /** Column orientation only: draw a line from the first AC bar top to the last AC bar top, with the delta to the right. */
+  showFirstLastDelta: boolean;
   width: number;
   height: number;
   callbacks?: ChartCallbacks;
@@ -63,7 +69,7 @@ export function renderChart(svgEl: SVGSVGElement, data: ChartData, cfg: ChartCon
 
   defs(svg);
 
-  const points = data.points;
+  const points = sortPoints(data.points, cfg);
   if (!points.length) {
     svg.attr("width", cfg.width).attr("height", cfg.height);
     svg
@@ -122,6 +128,30 @@ function truncateTextEnd<T>(
   });
 }
 
+function sortPoints(points: CategoryPoint[], cfg: ChartConfig): CategoryPoint[] {
+  if (cfg.sortBy === "category" && cfg.sortDir === "asc") return points;
+  const dir = cfg.sortDir === "asc" ? 1 : -1;
+  const keyOf = (p: CategoryPoint): number | string => {
+    switch (cfg.sortBy) {
+      case "actual": return p.actual ?? Number.NEGATIVE_INFINITY;
+      case "reference": return p.reference ?? Number.NEGATIVE_INFINITY;
+      case "variance":
+        return p.actual != null && p.reference != null ? p.actual - p.reference : Number.NEGATIVE_INFINITY;
+      case "variancePct":
+        return p.actual != null && p.reference != null && p.reference !== 0
+          ? (p.actual - p.reference) / Math.abs(p.reference)
+          : Number.NEGATIVE_INFINITY;
+      default: return p.category;
+    }
+  };
+  return points.slice().sort((a, b) => {
+    const ka = keyOf(a);
+    const kb = keyOf(b);
+    if (typeof ka === "string" && typeof kb === "string") return dir * ka.localeCompare(kb);
+    return dir * ((ka as number) - (kb as number));
+  });
+}
+
 function defs(svg: d3.Selection<SVGSVGElement, unknown, null, undefined>) {
   const defs = svg.append("defs");
   const p = defs
@@ -152,7 +182,9 @@ function renderColumn(
   const axisH = AXIS_SIZE + 6;
   const tierGapTotal = TIER_GAP * (numTiers(cfg) - 1);
   const hUsable = cfg.height - axisH - tierGapTotal - 14; // 14 = top space for headers
-  const ratios = [60, cfg.showAbsoluteTier ? 20 : 0, cfg.showPercentTier ? 20 : 0];
+  // Tier order (top -> bottom): abs deviation, pct deviation (pin), base AC|scenario.
+  // Ratios mirror that order: [20, 20, 60].
+  const ratios = [cfg.showAbsoluteTier ? 20 : 0, cfg.showPercentTier ? 20 : 0, 60];
   const sum = ratios.reduce((a, b) => a + b, 0) || 60;
   const tierH = ratios.map((r) => (r / sum) * hUsable);
 
@@ -172,31 +204,29 @@ function renderColumn(
     .paddingInner(0.25)
     .paddingOuter(0.15);
 
-  // Base tier
-  let yOff = 14;
-  const baseG = svg.append("g").attr("transform", `translate(${padL},${yOff})`);
-  drawBaseTierColumn(baseG, points, x, tierH[0], cfg);
-  yOff += tierH[0];
-
   // Pixels-per-unit of the base value scale (after .nice()), shared with abs variance tier.
   const baseVals = points.flatMap((p) => [p.actual ?? 0, p.reference ?? 0]);
   const bMax = d3.max(baseVals) ?? 1;
   const bMin = Math.min(0, d3.min(baseVals) ?? 0);
   const nicedDomain = d3.scaleLinear().domain([bMin, bMax]).nice().domain();
-  const basePPU = tierH[0] / ((nicedDomain[1] - nicedDomain[0]) || 1);
+  const basePPU = tierH[2] / ((nicedDomain[1] - nicedDomain[0]) || 1);
 
+  let yOff = 14;
   if (cfg.showAbsoluteTier) {
-    yOff += TIER_GAP;
     const g = svg.append("g").attr("transform", `translate(${padL},${yOff})`);
-    drawVarianceTierColumn(g, variance, x, tierH[1], cfg, "abs", basePPU);
-    yOff += tierH[1];
+    drawVarianceTierColumn(g, variance, x, tierH[0], cfg, "abs", basePPU);
+    yOff += tierH[0] + TIER_GAP;
   }
   if (cfg.showPercentTier) {
-    yOff += TIER_GAP;
     const g = svg.append("g").attr("transform", `translate(${padL},${yOff})`);
-    drawVarianceTierColumn(g, variance, x, tierH[2], cfg, "pct");
-    yOff += tierH[2];
+    drawVarianceTierColumn(g, variance, x, tierH[1], cfg, "pct");
+    yOff += tierH[1] + TIER_GAP;
   }
+
+  // Base tier (now at the bottom, deviations sit above it)
+  const baseG = svg.append("g").attr("transform", `translate(${padL},${yOff})`);
+  drawBaseTierColumn(baseG, points, x, tierH[2], cfg);
+  yOff += tierH[2];
 
   // Category axis
   const axisG = svg.append("g").attr("transform", `translate(${padL},${cfg.height - axisH + 2})`);
@@ -290,6 +320,51 @@ function drawBaseTierColumn(
     .attr("font-size", LABEL_SIZE)
     .attr("fill", "#333")
     .text((d) => (d.actual == null || Math.abs(y(d.actual) - y(0)) < 12 ? "" : formatNumber(d.actual, { decimals: cfg.decimals })));
+
+  // First-to-last delta line (column orientation only)
+  if (cfg.showFirstLastDelta) {
+    const firstIdx = points.findIndex((p) => p.actual != null);
+    let lastIdx = -1;
+    for (let i = points.length - 1; i >= 0; i--) {
+      if (points[i].actual != null) { lastIdx = i; break; }
+    }
+    if (firstIdx >= 0 && lastIdx > firstIdx) {
+      const pF = points[firstIdx];
+      const pL = points[lastIdx];
+      const xF = (x(pF.category) ?? 0) + acOffset + barW / 2;
+      const xL = (x(pL.category) ?? 0) + acOffset + barW / 2;
+      const yF = y(pF.actual ?? 0);
+      const yL = y(pL.actual ?? 0);
+      const diff = (pL.actual ?? 0) - (pF.actual ?? 0);
+      const pct = pF.actual ? (diff / Math.abs(pF.actual)) * 100 : 0;
+      const color = diff >= 0 ? cfg.colors.positive : cfg.colors.negative;
+
+      g.append("line")
+        .attr("class", "first-last-delta")
+        .attr("x1", xF).attr("y1", yF)
+        .attr("x2", xL).attr("y2", yL)
+        .attr("stroke", color)
+        .attr("stroke-width", 1.25)
+        .attr("stroke-dasharray", "3,2");
+
+      g.append("circle").attr("cx", xF).attr("cy", yF).attr("r", 2.5).attr("fill", color);
+      g.append("circle").attr("cx", xL).attr("cy", yL).attr("r", 2.5).attr("fill", color);
+
+      const lblX = (x(pL.category) ?? 0) + acOffset + barW + 4;
+      const lblY = yL;
+      const text = `${diff >= 0 ? "+" : "\u2212"}${formatNumber(Math.abs(diff), { decimals: cfg.decimals })} (${pct >= 0 ? "+" : "\u2212"}${Math.abs(pct).toFixed(0)}%)`;
+      g.append("text")
+        .attr("class", "first-last-delta-lbl")
+        .attr("x", lblX)
+        .attr("y", lblY)
+        .attr("dominant-baseline", "middle")
+        .attr("text-anchor", "start")
+        .attr("font-size", LABEL_SIZE)
+        .attr("font-weight", "bold")
+        .attr("fill", color)
+        .text(text);
+    }
+  }
 }
 
 function drawVarianceTierColumn(

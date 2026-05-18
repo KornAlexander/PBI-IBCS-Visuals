@@ -24,6 +24,26 @@
         "axisWidthPercent": { "type": { "numeric": true } },
         "maxVisibleCategories": { "type": { "numeric": true } },
         "enableScrollbar": { "type": { "bool": true } },
+        "sortBy": {
+          "type": {
+            "enumeration": [
+              { "value": "category", "displayName": "Category" },
+              { "value": "actual", "displayName": "Actual" },
+              { "value": "reference", "displayName": "Reference" },
+              { "value": "variance", "displayName": "Δ Absolute" },
+              { "value": "variancePct", "displayName": "Δ Percent" }
+            ]
+          }
+        },
+        "sortDir": {
+          "type": {
+            "enumeration": [
+              { "value": "asc", "displayName": "Ascending" },
+              { "value": "desc", "displayName": "Descending" }
+            ]
+          }
+        },
+        "showFirstLastDelta": { "type": { "bool": true } },
         "minBandPx": { "type": { "numeric": true } }
       }
     },

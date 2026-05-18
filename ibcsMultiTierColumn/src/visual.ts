@@ -98,7 +98,12 @@ export class Visual implements IVisual {
                 acFill: this.formattingSettings.colors.acFill.value.value || PALETTE.acFill
             },
             axisWidthPercent: clamp(this.formattingSettings.general.axisWidthPercent.value ?? 25, 5, 60),
-            maxVisibleCategories: Math.max(1, Math.round(this.formattingSettings.general.maxVisibleCategories.value ?? 10)),            enableScrollbar: this.formattingSettings.general.enableScrollbar.value,            minBandPx: Math.max(8, Math.round(this.formattingSettings.general.minBandPx.value ?? 28)),
+            maxVisibleCategories: Math.max(1, Math.round(this.formattingSettings.general.maxVisibleCategories.value ?? 10)),
+            enableScrollbar: this.formattingSettings.general.enableScrollbar.value,
+            minBandPx: Math.max(8, Math.round(this.formattingSettings.general.minBandPx.value ?? 48)),
+            sortBy: (this.formattingSettings.general.sortBy.value.value as ChartConfig["sortBy"]) ?? "category",
+            sortDir: (this.formattingSettings.general.sortDir.value.value as ChartConfig["sortDir"]) ?? "asc",
+            showFirstLastDelta: this.formattingSettings.general.showFirstLastDelta.value,
             width: Math.max(80, options.viewport.width),
             height: Math.max(80, options.viewport.height),
             callbacks: {

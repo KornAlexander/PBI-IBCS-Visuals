@@ -101,6 +101,9 @@ export class Visual implements IVisual {
             maxVisibleCategories: Math.max(1, Math.round(this.formattingSettings.general.maxVisibleCategories.value ?? 10)),
             enableScrollbar: this.formattingSettings.general.enableScrollbar.value,
             minBandPx: Math.max(8, Math.round(this.formattingSettings.general.minBandPx.value ?? 28)),
+            sortBy: (this.formattingSettings.general.sortBy.value.value as ChartConfig["sortBy"]) ?? "category",
+            sortDir: (this.formattingSettings.general.sortDir.value.value as ChartConfig["sortDir"]) ?? "desc",
+            showFirstLastDelta: this.formattingSettings.general.showFirstLastDelta.value,
             width: Math.max(80, options.viewport.width),
             height: Math.max(80, options.viewport.height),
             callbacks: {
