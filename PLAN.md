@@ -1,13 +1,12 @@
 # IBCS Multi-Tier Variance Visuals — Build Plan
 
-**Repo:** `C:\Users\alkorn\repos\PBI-IBCS-Visuals`
 **Visuals in scope:**
 1. `ibcsMultiTierBar` — horizontal multi-tier variance bar chart, IBCS-compliant
 2. `ibcsMultiTierColumn` — vertical multi-tier variance column chart, IBCS-compliant
 
-**Source inputs:** [ibcs-custom-visual-plan.md](../../Downloads/ibcs-custom-visual-plan.md) (Elena Drakulevska + Phil Seamark research) and Phil's reference repo [`dax-tips/CustomVisuals`](https://github.com/dax-tips/CustomVisuals) — especially `kpiAchievementCard` and `multiFacetColumnChart`.
+**Source inputs:** prior IBCS custom-visual research, plus the public reference repo [`dax-tips/CustomVisuals`](https://github.com/dax-tips/CustomVisuals) — especially `kpiAchievementCard` and `multiFacetColumnChart`.
 
-**Functional reference point:** Zebra BI Charts for Power BI — see §1a below for the capability map and the MVP / Phase-2 / out-of-scope split against it.
+**Functional reference point:** the leading commercial IBCS variance charts for Power BI — see §1a below for the capability map and the MVP / Phase-2 / out-of-scope split against it.
 
 **Visual target:** [docs/reference-image.png](docs/reference-image.png) — the attached IBCS integrated variance example (Oct/Nov/Dec 2017, AC vs PY, with FC for Dec). The FC bar in the picture is for Phase 2; the MVP reproduces the same layout with AC + PY (or AC + PL) only.
 
@@ -29,11 +28,11 @@ This matches the attached reference image: Oct / Nov / Dec 2017 along the bottom
 
 ---
 
-## 1a. Reference: Zebra BI Charts capability map
+## 1a. Reference: commercial IBCS visual capability map
 
-Zebra BI Charts is the de-facto IBCS-certified commercial reference. We use its public feature set as the long-term north star and pick a strict subset for v0.1.
+The established commercial IBCS-certified visuals are the de-facto reference. We researched their public feature sets and use them as the long-term north star, picking a strict subset for v0.1.
 
-**Confirmed Zebra BI Charts capabilities** (from [zebrabi.com/power-bi-custom-visuals/charts](https://zebrabi.com/power-bi-custom-visuals/charts/) and [help.zebrabi.com](https://help.zebrabi.com/kb/power-bi/zebra-bi-charts/)):
+**Capabilities researched across the leading commercial IBCS visual providers:**
 
 | # | Capability | MVP (v0.1) | Phase 2 | Out of scope (v1+) |
 |---|---|:---:|:---:|:---:|
@@ -61,12 +60,12 @@ Zebra BI Charts is the de-facto IBCS-certified commercial reference. We use its 
 | 22 | Custom themes via JSON | format-pane only | JSON theme import | |
 | 23 | Number formats (parentheses for negatives, units in title, decimal control, thin-space thousands) | ✓ | | |
 | 24 | Highlight specific columns (right-click on axis label) | | ✓ | |
-| 25 | Responsive layout (auto-adapt info density to viewport) | basic — hide pct tier / labels below threshold | progressive (collapse Δ tier, abbreviate labels, hide markers) | full Zebra-grade responsiveness |
+| 25 | Responsive layout (auto-adapt info density to viewport) | basic — hide pct tier / labels below threshold | progressive (collapse Δ tier, abbreviate labels, hide markers) | full commercial-grade responsiveness |
 | 26 | Dynamic legend names | inline scenario codes (`PY`, `PL`) | configurable | |
 | 27 | Empty-value handling (gap / zero / interpolate) | gap only | configurable | |
 | 28 | Color-blind friendly defaults | green/red defaults only | CVD palette + chevron arrows | |
 
-**Reading guide:** the MVP delivers rows 1–8 (subset), 23, plus the basic version of 25–27 — i.e. one *integrated variance chart* in two orientations, with AC vs PY/PL, semantic variance colors, IBCS number formats, and minimal responsiveness. That is roughly the equivalent of selecting the "Integrated Variance" chart type in Zebra BI with no additional features turned on. Phase 2 covers the most-requested follow-ons (FC, axis break, small multiples, drill, highlight, theme JSON). Anything in the rightmost column stays out of scope until a v1.0 decision.
+**Reading guide:** the MVP delivers rows 1–8 (subset), 23, plus the basic version of 25–27 — i.e. one *integrated variance chart* in two orientations, with AC vs PY/PL, semantic variance colors, IBCS number formats, and minimal responsiveness. That is roughly the equivalent of an "Integrated Variance" chart type in a commercial IBCS visual with no additional features turned on. Phase 2 covers the most-requested follow-ons (FC, axis break, small multiples, drill, highlight, theme JSON). Anything in the rightmost column stays out of scope until a v1.0 decision.
 
 IBCS conventions we respect:
 
@@ -182,7 +181,7 @@ Each phase ends with a git commit; push after each phase.
 - 0.1 Save the attached reference image to `docs/reference-image.png` as the canonical visual target.
 - 0.2 Write [docs/IBCS-CHECKLIST.md](docs/IBCS-CHECKLIST.md) — rules the MVP must pass (notation table, semantic colors, label conventions, tier ordering).
 - 0.3 Write [docs/SPEC.md](docs/SPEC.md) — frozen scope (copy §1–§2) + acceptance criteria: "the visual matches `reference-image.png` for the documented sample dataset".
-- 0.4 Survey: open Zebra BI Variance, Inforiver Variance, Graphomate Comparison — side-by-side with the reference; save into `docs/screenshots/reference/`.
+- 0.4 Survey: open the leading commercial IBCS variance visuals side-by-side with the reference; save into `docs/screenshots/reference/`.
 - 0.5 Read `dax-tips/CustomVisuals/kpiAchievementCard/src/visual.ts` (variance label + marker patterns) and `multiFacetColumnChart` (multi-band layout).
 - 0.6 Read Microsoft `sampleBarChart` — canonical `capabilities.json` + `IVisual` lifecycle.
 

@@ -6,7 +6,7 @@ Two IBCS-compliant Power BI custom visuals plus a shared core module.
 - [`ibcsMultiTierColumn/`](ibcsMultiTierColumn/) — vertical integrated variance chart.
 - [`shared/`](shared/) — pure-TS variance math, scenario styling, types (consumed via tsconfig `@shared/*` path alias).
 - [`docs/`](docs/) — spec, IBCS checklist, self-test strategy.
-- [`PLAN.md`](PLAN.md) — build plan, scope, phases, Zebra BI capability map.
+- [`PLAN.md`](PLAN.md) — build plan, scope, phases, commercial IBCS visual capability map.
 
 ## Status
 
