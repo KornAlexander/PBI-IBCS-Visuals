@@ -7,11 +7,19 @@ export interface TopNOptions {
   showOthers: boolean;
   /** Label used for the aggregated bucket. Defaults to "Others". */
   othersLabel?: string;
+  /**
+   * Which end of the (already sorted) list to keep:
+   *  - `"top"`    keep the leading N (default).
+   *  - `"bottom"` keep the trailing N (Bottom N) — useful for "worst/smallest" views.
+   * In both cases the kept points retain their original relative order and the "Others"
+   * bucket is appended after them.
+   */
+  from?: "top" | "bottom";
 }
 
 /**
- * Reduce a (already sorted) list of category points to the top N, optionally folding the
- * remainder into a single aggregated "Others" point.
+ * Reduce a (already sorted) list of category points to the top (or bottom) N, optionally
+ * folding the remainder into a single aggregated "Others" point.
  *
  * - Returns a shallow copy; the input is never mutated.
  * - When `topN` is non-positive or covers the whole list, the points are returned unchanged.
@@ -24,12 +32,14 @@ export function applyTopN(points: CategoryPoint[], opts: TopNOptions): CategoryP
     return points.slice();
   }
 
-  const top = points.slice(0, n);
+  const fromBottom = opts.from === "bottom";
+  const kept = fromBottom ? points.slice(points.length - n) : points.slice(0, n);
+  const rest = fromBottom ? points.slice(0, points.length - n) : points.slice(n);
+
   if (!opts.showOthers) {
-    return top;
+    return kept;
   }
 
-  const rest = points.slice(n);
   let actual: number | null = null;
   let reference: number | null = null;
   for (const p of rest) {
@@ -37,6 +47,6 @@ export function applyTopN(points: CategoryPoint[], opts: TopNOptions): CategoryP
     if (p.reference != null) reference = (reference ?? 0) + p.reference;
   }
 
-  top.push({ category: opts.othersLabel ?? "Others", actual, reference });
-  return top;
+  kept.push({ category: opts.othersLabel ?? "Others", actual, reference });
+  return kept;
 }

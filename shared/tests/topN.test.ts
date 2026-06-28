@@ -57,4 +57,17 @@ describe("applyTopN", () => {
     applyTopN(pts, { topN: 2, showOthers: true });
     expect(pts).toEqual(copy);
   });
+
+  it("keeps the trailing N when from is 'bottom'", () => {
+    const out = applyTopN(pts, { topN: 2, showOthers: false, from: "bottom" });
+    expect(out.map((p) => p.category)).toEqual(["D", "E"]);
+  });
+
+  it("aggregates the leading remainder into Others when from is 'bottom'", () => {
+    const out = applyTopN(pts, { topN: 2, showOthers: true, from: "bottom" });
+    expect(out.map((p) => p.category)).toEqual(["D", "E", "Others"]);
+    const others = out[2];
+    expect(others.actual).toBe(100 + 80 + 60);
+    expect(others.reference).toBe(90 + 70 + 50);
+  });
 });

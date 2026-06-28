@@ -5,6 +5,8 @@ import { getScenarioStyle, VARIANCE_COLORS } from "./scenarioStyle";
 import { formatNumber, formatPercent } from "./numberFormat";
 import { applyTopN } from "./topN";
 import { resolveLayout, type LayoutMode } from "./layout";
+import { fillMissingValues, type EmptyValueMode } from "./emptyValues";
+import { computeCagr } from "./cagr";
 
 export type Orientation = "column" | "bar";
 
@@ -62,6 +64,15 @@ export interface ChartConfig {
   topN?: number;
   /** When true (and `topN` is active), fold the remaining categories into an "Others" point. */
   showOthers?: boolean;
+  /** Which end of the sorted list Top N keeps: leading ("top", default) or trailing ("bottom"). */
+  topNFrom?: "top" | "bottom";
+  /** How missing (null) values are handled before rendering. Defaults to "gap". */
+  emptyValueMode?: EmptyValueMode;
+  /**
+   * Column orientation only: when `showFirstLastDelta` is on, display the first→last change
+   * as a compound per-period growth rate (CAGR) instead of the simple total change percent.
+   */
+  firstLastCagr?: boolean;
   /**
    * Layout selection. `auto` (default) adapts to the canvas size: inline variance when small,
    * a single variance tier when medium, and the full multi-tier layout when large.
@@ -115,9 +126,10 @@ export function renderChart(svgEl: SVGSVGElement, data: ChartData, cfg: ChartCon
 
   defs(svg);
 
-  const points = applyTopN(sortPoints(data.points, cfg), {
+  const points = applyTopN(sortPoints(fillMissingValues(data.points, cfg.emptyValueMode ?? "gap"), cfg), {
     topN: cfg.topN ?? 0,
-    showOthers: cfg.showOthers !== false
+    showOthers: cfg.showOthers !== false,
+    from: cfg.topNFrom ?? "top"
   });
   if (!points.length) {
     svg.attr("width", cfg.width).attr("height", cfg.height);
@@ -465,7 +477,18 @@ function drawBaseTierColumn(
       const lblY = yL;
       const dAbs = cfg.decimalsAbs ?? cfg.decimals;
       const dPct = cfg.decimalsPct ?? 0;
-      const text = `${diff >= 0 ? "+" : "\u2212"}${formatNumber(Math.abs(diff), { decimals: dAbs })} (${pct >= 0 ? "+" : "\u2212"}${Math.abs(pct).toFixed(dPct)}%)`;
+      let pctText: string;
+      if (cfg.firstLastCagr) {
+        const cagr = computeCagr(pF.actual, pL.actual, lastIdx - firstIdx);
+        const cagrPct = cagr == null ? null : cagr * 100;
+        pctText =
+          cagrPct == null
+            ? "CAGR n/a"
+            : `${cagrPct >= 0 ? "+" : "\u2212"}${Math.abs(cagrPct).toFixed(dPct)}% CAGR`;
+      } else {
+        pctText = `${pct >= 0 ? "+" : "\u2212"}${Math.abs(pct).toFixed(dPct)}%`;
+      }
+      const text = `${diff >= 0 ? "+" : "\u2212"}${formatNumber(Math.abs(diff), { decimals: dAbs })} (${pctText})`;
       g.append("text")
         .attr("class", "first-last-delta-lbl")
         .attr("x", lblX)

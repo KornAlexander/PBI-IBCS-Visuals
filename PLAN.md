@@ -49,9 +49,9 @@ The established commercial IBCS-certified visuals are the de-facto reference. We
 | 11 | Segmented / stacked / combo charts | | | ✓ |
 | 12 | Small multiples (Group bucket, auto-scaled) | | ✓ (one extra category level → grid) | richer auto-layout |
 | 13 | Drill-down via category hierarchy | | ✓ | |
-| 14 | Top N + Others | | ✓ | |
+| 14 | Top N + Others | ✓ Top N **and Bottom N** + Others | | |
 | 15 | 1-click axis break | | ✓ | |
-| 16 | CAGR arrows | | | ✓ |
+| 16 | CAGR arrows | CAGR % on first→last overlay (column) | full CAGR arrows | |
 | 17 | Forecast (FC) display + comparison | | ✓ (notation + label) | full FC-vs-AC overlay |
 | 18 | Difference highlight (e.g. min↔max bracket) | | | ✓ |
 | 19 | Chevron arrows for variances (color-blind aid) | | | ✓ |
@@ -62,7 +62,7 @@ The established commercial IBCS-certified visuals are the de-facto reference. We
 | 24 | Highlight specific columns (right-click on axis label) | | ✓ | |
 | 25 | Responsive layout (auto-adapt info density to viewport) | basic — hide pct tier / labels below threshold | progressive (collapse Δ tier, abbreviate labels, hide markers) | full commercial-grade responsiveness |
 | 26 | Dynamic legend names | inline scenario codes (`PY`, `PL`) | configurable | |
-| 27 | Empty-value handling (gap / zero / interpolate) | gap only | configurable | |
+| 27 | Empty-value handling (gap / zero / interpolate) | ✓ gap / zero / interpolate | | |
 | 28 | Color-blind friendly defaults | green/red defaults only | CVD palette + chevron arrows | |
 
 **Reading guide:** the MVP delivers rows 1–8 (subset), 23, plus the basic version of 25–27 — i.e. one *integrated variance chart* in two orientations, with AC vs PY/PL, semantic variance colors, IBCS number formats, and minimal responsiveness. That is roughly the equivalent of an "Integrated Variance" chart type in a commercial IBCS visual with no additional features turned on. Phase 2 covers the most-requested follow-ons (FC, axis break, small multiples, drill, highlight, theme JSON). Anything in the rightmost column stays out of scope until a v1.0 decision.

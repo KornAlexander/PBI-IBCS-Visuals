@@ -115,6 +115,12 @@ class GeneralCard extends FormattingSettingsCard {
         value: false
     });
 
+    firstLastCagr = new formattingSettings.ToggleSwitch({
+        name: "firstLastCagr",
+        displayName: "First→last as CAGR (per-period)",
+        value: false
+    });
+
     showReferenceMarker = new formattingSettings.ToggleSwitch({
         name: "showReferenceMarker",
         displayName: "Show reference marker",
@@ -137,6 +143,27 @@ class GeneralCard extends FormattingSettingsCard {
         name: "showOthers",
         displayName: "Show \u201cOthers\u201d (group remaining)",
         value: true
+    });
+
+    topNFrom = new formattingSettings.ItemDropdown({
+        name: "topNFrom",
+        displayName: "Top N keeps",
+        items: [
+            { value: "top", displayName: "Top (leading)" },
+            { value: "bottom", displayName: "Bottom (trailing)" }
+        ],
+        value: { value: "top", displayName: "Top (leading)" }
+    });
+
+    emptyValueMode = new formattingSettings.ItemDropdown({
+        name: "emptyValueMode",
+        displayName: "Missing values",
+        items: [
+            { value: "gap", displayName: "Gap (leave empty)" },
+            { value: "zero", displayName: "Treat as zero" },
+            { value: "interpolate", displayName: "Interpolate" }
+        ],
+        value: { value: "gap", displayName: "Gap (leave empty)" }
     });
 
     layoutMode = new formattingSettings.ItemDropdown({
@@ -163,8 +190,8 @@ class GeneralCard extends FormattingSettingsCard {
         this.scenario, this.invert, this.showAbsoluteTier, this.showPercentTier,
         this.decimals, this.decimalsAbs, this.decimalsPct,
         this.axisWidthPercent, this.maxVisibleCategories, this.enableScrollbar,
-        this.sortBy, this.sortDir, this.showFirstLastDelta, this.showReferenceMarker,
-        this.topNEnabled, this.topN, this.showOthers, this.layoutMode, this.minBandPx,
+        this.sortBy, this.sortDir, this.showFirstLastDelta, this.firstLastCagr, this.showReferenceMarker,
+        this.topNEnabled, this.topN, this.showOthers, this.topNFrom, this.emptyValueMode, this.layoutMode, this.minBandPx,
         this.pctOutlierCutoff, this.absOutlierCutoff
     ];
 }

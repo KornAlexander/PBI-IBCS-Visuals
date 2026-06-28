@@ -156,9 +156,12 @@ export class Visual implements IVisual {
             pctOutlierCutoff: Math.max(0, this.formattingSettings.general.pctOutlierCutoff.value ?? 0),
             absOutlierCutoff: Math.max(0, this.formattingSettings.general.absOutlierCutoff.value ?? 0),
             showFirstLastDelta: this.formattingSettings.general.showFirstLastDelta.value,
+            firstLastCagr: this.formattingSettings.general.firstLastCagr.value,
             showReferenceMarker: this.formattingSettings.general.showReferenceMarker.value,
             topN: this.formattingSettings.general.topNEnabled.value ? this.currentTopN() : 0,
             showOthers: this.formattingSettings.general.showOthers.value,
+            topNFrom: (this.formattingSettings.general.topNFrom.value.value as ChartConfig["topNFrom"]) ?? "top",
+            emptyValueMode: (this.formattingSettings.general.emptyValueMode.value.value as ChartConfig["emptyValueMode"]) ?? "gap",
             layoutMode: (this.formattingSettings.general.layoutMode.value.value as ChartConfig["layoutMode"]) ?? "auto",
             font: {
                 family: this.formattingSettings.text.font.fontFamily.value || "Segoe UI, sans-serif",
