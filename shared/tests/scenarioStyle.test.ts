@@ -27,9 +27,11 @@ describe("getScenarioStyle", () => {
     expect(getScenarioStyle("BU").patternId).toBeNull();
   });
 
-  it("FC is hatched", () => {
+  it("FC is a dotted outline (dots pattern + dashed border)", () => {
     const s = getScenarioStyle("FC");
-    expect(s.patternId).toBe("hatch");
+    expect(s.patternId).toBe("dots");
+    expect(s.strokeWidth).toBeGreaterThan(0);
+    expect(s.strokeDasharray).toBeTruthy();
   });
 
   it("VARIANCE_COLORS uses bright red as negative default", () => {

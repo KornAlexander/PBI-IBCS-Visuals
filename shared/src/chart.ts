@@ -3,6 +3,8 @@ import type { CategoryPoint, Scenario, VariancePoint } from "./types";
 import { computeVarianceSeries } from "./variance";
 import { getScenarioStyle, VARIANCE_COLORS } from "./scenarioStyle";
 import { formatNumber, formatPercent } from "./numberFormat";
+import { applyTopN } from "./topN";
+import { resolveLayout, type LayoutMode } from "./layout";
 
 export type Orientation = "column" | "bar";
 
@@ -51,6 +53,25 @@ export interface ChartConfig {
   absOutlierCutoff: number;
   /** Column orientation only: draw a line from the first AC bar top to the last AC bar top, with the delta to the right. */
   showFirstLastDelta: boolean;
+  /** Show the IBCS reference marker (triangle glyph) on the base tier pointing from the reference value at the AC bar. */
+  showReferenceMarker: boolean;
+  /**
+   * Keep only the leading `topN` categories (after sorting). 0/undefined = show all.
+   * Remaining categories are aggregated into a single "Others" bucket when `showOthers` is true.
+   */
+  topN?: number;
+  /** When true (and `topN` is active), fold the remaining categories into an "Others" point. */
+  showOthers?: boolean;
+  /**
+   * Layout selection. `auto` (default) adapts to the canvas size: inline variance when small,
+   * a single variance tier when medium, and the full multi-tier layout when large.
+   */
+  layoutMode?: LayoutMode;
+  /**
+   * Internal: when true the variance is rendered inline (as combined Δ / Δ% text next to the
+   * base tier) instead of as separate graphical tiers. Resolved from `layoutMode`.
+   */
+  inlineVariance?: boolean;
   /** Font/text styling applied to all labels, headers and axis text. */
   font: {
     family: string;
@@ -87,9 +108,17 @@ export function renderChart(svgEl: SVGSVGElement, data: ChartData, cfg: ChartCon
     if (event.target === this) cfg.callbacks?.onBackgroundClick?.();
   });
 
+  // Accessibility: expose the chart as a labelled group for assistive technology.
+  svg
+    .attr("role", "group")
+    .attr("aria-label", `IBCS integrated variance chart, AC versus ${cfg.scenario}`);
+
   defs(svg);
 
-  const points = sortPoints(data.points, cfg);
+  const points = applyTopN(sortPoints(data.points, cfg), {
+    topN: cfg.topN ?? 0,
+    showOthers: cfg.showOthers !== false
+  });
   if (!points.length) {
     svg.attr("width", cfg.width).attr("height", cfg.height);
     svg
@@ -105,13 +134,34 @@ export function renderChart(svgEl: SVGSVGElement, data: ChartData, cfg: ChartCon
 
   const variance = computeVarianceSeries(points, cfg.invert);
 
-  if (cfg.orientation === "column") {
-    renderColumn(svg, points, variance, cfg);
+  const eff = resolveEffectiveConfig(cfg);
+
+  if (eff.orientation === "column") {
+    renderColumn(svg, points, variance, eff);
   } else {
-    renderBar(svg, points, variance, cfg);
+    renderBar(svg, points, variance, eff);
   }
 
-  applySelectionDimming(svg, cfg);
+  applySelectionDimming(svg, eff);
+}
+
+/**
+ * Derive the effective configuration for the resolved layout. The user toggles for the
+ * absolute / percent tiers are honoured in `multi`; collapsed to one tier in `single`; and
+ * replaced by inline variance text in `inline`.
+ */
+function resolveEffectiveConfig(cfg: ChartConfig): ChartConfig {
+  const layout = resolveLayout(cfg.layoutMode, cfg.orientation, cfg.width, cfg.height);
+  const eff: ChartConfig = { ...cfg, inlineVariance: false };
+  if (layout === "inline") {
+    eff.inlineVariance = true;
+    eff.showAbsoluteTier = false;
+    eff.showPercentTier = false;
+  } else if (layout === "single") {
+    // Collapse to a single variance tier, preferring the absolute tier.
+    if (cfg.showAbsoluteTier) eff.showPercentTier = false;
+  }
+  return eff;
 }
 
 function applySelectionDimming(
@@ -182,6 +232,16 @@ function defs(svg: d3.Selection<SVGSVGElement, unknown, null, undefined>) {
     .attr("patternTransform", "rotate(45)");
   p.append("rect").attr("width", 4).attr("height", 4).attr("fill", "#FFFFFF");
   p.append("line").attr("x1", 0).attr("y1", 0).attr("x2", 0).attr("y2", 4).attr("stroke", "#4D4D4D").attr("stroke-width", 1);
+
+  // Dotted pattern for FC scenario notation (distinct from PL/BU hatch).
+  const d = defs
+    .append("pattern")
+    .attr("id", "dots")
+    .attr("patternUnits", "userSpaceOnUse")
+    .attr("width", 3)
+    .attr("height", 3);
+  d.append("rect").attr("width", 3).attr("height", 3).attr("fill", "#FFFFFF");
+  d.append("circle").attr("cx", 1).attr("cy", 1).attr("r", 0.6).attr("fill", "#4D4D4D");
 }
 
 /* ----------------------------------------------------------------- COLUMN */
@@ -248,6 +308,10 @@ function renderColumn(
   // Base tier (now at the bottom, deviations sit above it)
   const baseG = svg.append("g").attr("transform", `translate(${padL},${yOff})`);
   drawBaseTierColumn(baseG, points, x, tierH[2], cfg);
+  if (cfg.inlineVariance) {
+    const ig = svg.append("g").attr("transform", `translate(${padL},${yOff})`);
+    drawInlineVarianceColumn(ig, points, variance, x, tierH[2], cfg);
+  }
   yOff += tierH[2];
 
   // Category axis
@@ -265,6 +329,13 @@ function renderColumn(
     .text((d) => d.category);
   colLabels.append("title").text((d) => d.category);
   truncateTextEnd<CategoryPoint>(colLabels, () => x.bandwidth() + 2);
+
+  addAccessibilityLayer(svg, points, variance, cfg, { tx: padL, ty: 0 }, (i) => ({
+    x: x(points[i].category) ?? 0,
+    y: 0,
+    w: x.bandwidth(),
+    h: chartH
+  }));
 }
 
 function drawBaseTierColumn(
@@ -313,7 +384,8 @@ function drawBaseTierColumn(
     .attr("height", (d) => Math.abs(y(d.reference ?? 0) - y(0)))
     .attr("fill", refStyle.patternId ? `url(#${refStyle.patternId})` : refStyle.fill)
     .attr("stroke", refStyle.stroke)
-    .attr("stroke-width", refStyle.strokeWidth);
+    .attr("stroke-width", refStyle.strokeWidth)
+    .attr("stroke-dasharray", refStyle.strokeDasharray ?? null);
 
   // AC (right, on top, same size)
   g.selectAll(".bar-ac")
@@ -329,6 +401,23 @@ function drawBaseTierColumn(
     .style("cursor", "pointer");
 
   attachInteractivity(g, cfg);
+
+  // IBCS reference marker: right-pointing glyph at the reference value, pointing at the AC bar.
+  if (cfg.showReferenceMarker) {
+    g.selectAll(".ref-marker")
+      .data(points.filter((p) => p.reference != null && p.actual != null)).enter()
+      .append("text")
+      .attr("class", "ref-marker")
+      .attr("data-cat", (d) => d.category)
+      .attr("x", (d) => (x(d.category) ?? 0) + acOffset - 1)
+      .attr("y", (d) => y(d.reference ?? 0))
+      .attr("text-anchor", "end")
+      .attr("dominant-baseline", "middle")
+      .attr("font-size", Math.max(6, cfg.font.size - 1))
+      .attr("fill", cfg.font.color)
+      .attr("aria-hidden", "true")
+      .text("\u25BA");
+  }
 
   // AC value labels
   g.selectAll(".lbl-ac")
@@ -579,6 +668,24 @@ function renderBar(
   truncateTextEnd<CategoryPoint>(labels, () => axisW - 8);
 
   const totalW = chartW - axisW;
+
+  if (cfg.inlineVariance) {
+    const inlineW = Math.max(72, Math.min(180, Math.round(totalW * 0.34)));
+    const baseW = Math.max(40, totalW - inlineW - TIER_GAP);
+    const baseG = svg.append("g").attr("transform", `translate(${axisW},${padTop})`);
+    drawBaseTierBar(baseG, points, y, baseW, cfg);
+    const ig = svg.append("g").attr("transform", `translate(${axisW + baseW + TIER_GAP},${padTop})`);
+    drawInlineVarianceBar(ig, variance, y, inlineW, cfg);
+
+    addAccessibilityLayer(svg, points, variance, cfg, { tx: 0, ty: padTop }, (i) => ({
+      x: 0,
+      y: y(points[i].category) ?? 0,
+      w: chartW,
+      h: y.bandwidth()
+    }));
+    return;
+  }
+
   const ratios = [60, cfg.showAbsoluteTier ? 20 : 0, cfg.showPercentTier ? 20 : 0];
   const sum = ratios.reduce((a, b) => a + b, 0) || 60;
   const usableW = totalW - TIER_GAP * (numTiers(cfg) - 1);
@@ -607,6 +714,13 @@ function renderBar(
     const g = svg.append("g").attr("transform", `translate(${xOff},${padTop})`);
     drawVarianceTierBar(g, variance, y, widths[2], cfg, "pct");
   }
+
+  addAccessibilityLayer(svg, points, variance, cfg, { tx: 0, ty: padTop }, (i) => ({
+    x: 0,
+    y: y(points[i].category) ?? 0,
+    w: chartW,
+    h: y.bandwidth()
+  }));
 }
 
 function drawBaseTierBar(
@@ -652,7 +766,8 @@ function drawBaseTierBar(
     .attr("height", barH)
     .attr("fill", refStyle.patternId ? `url(#${refStyle.patternId})` : refStyle.fill)
     .attr("stroke", refStyle.stroke)
-    .attr("stroke-width", refStyle.strokeWidth);
+    .attr("stroke-width", refStyle.strokeWidth)
+    .attr("stroke-dasharray", refStyle.strokeDasharray ?? null);
 
   // AC (bottom, on top, same size)
   g.selectAll(".bar-ac")
@@ -668,6 +783,23 @@ function drawBaseTierBar(
     .style("cursor", "pointer");
 
   attachInteractivity(g, cfg);
+
+  // IBCS reference marker: down-pointing glyph at the reference value, pointing at the AC bar below it.
+  if (cfg.showReferenceMarker) {
+    g.selectAll(".ref-marker")
+      .data(points.filter((p) => p.reference != null && p.actual != null)).enter()
+      .append("text")
+      .attr("class", "ref-marker")
+      .attr("data-cat", (d) => d.category)
+      .attr("x", (d) => x(d.reference ?? 0))
+      .attr("y", (d) => (y(d.category) ?? 0) + acOffset - 1)
+      .attr("text-anchor", "middle")
+      .attr("dominant-baseline", "ideographic")
+      .attr("font-size", Math.max(6, cfg.font.size - 1))
+      .attr("fill", cfg.font.color)
+      .attr("aria-hidden", "true")
+      .text("\u25BC");
+  }
 
   // AC labels (at end of bar, clamped inside the base tier so they cannot collide with the next tier)
   g.selectAll(".lbl-ac")
@@ -858,11 +990,206 @@ function numTiers(cfg: ChartConfig): number {
   return 1 + (cfg.showAbsoluteTier ? 1 : 0) + (cfg.showPercentTier ? 1 : 0);
 }
 
+/** Build a screen-reader label summarising a category's AC / reference / Δ / Δ% values. */
+export function buildAriaLabel(p: CategoryPoint, v: VariancePoint, cfg: ChartConfig): string {
+  const na = "no data";
+  const ac = p.actual == null ? na : formatNumber(p.actual, { decimals: cfg.decimals });
+  const ref = p.reference == null ? na : formatNumber(p.reference, { decimals: cfg.decimals });
+  const abs =
+    v.absolute == null
+      ? na
+      : formatNumber(v.absolute, { decimals: cfg.decimalsAbs ?? cfg.decimals, negatives: "sign" });
+  const pct = v.percent == null ? na : formatPercent(v.percent, cfg.decimalsPct ?? 0);
+  return `${p.category}: AC ${ac}, ${cfg.scenario} ${ref}, Δ${cfg.scenario} ${abs}, Δ${cfg.scenario}% ${pct}`;
+}
+
+interface A11yRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/**
+ * Overlay one focusable, labelled rectangle per category so the visual is keyboard
+ * navigable and exposes per-category values to assistive technology. The rectangles are
+ * transparent and pointer-events:none so mouse hit-testing still reaches the underlying bars.
+ *
+ * Keyboard: Arrow keys move focus between categories, Enter/Space selects (cross-filter),
+ * Escape clears the selection.
+ */
+function addAccessibilityLayer(
+  svg: d3.Selection<SVGSVGElement, unknown, null, undefined>,
+  points: CategoryPoint[],
+  variance: VariancePoint[],
+  cfg: ChartConfig,
+  offset: { tx: number; ty: number },
+  rectFor: (index: number) => A11yRect
+): void {
+  const cb = cfg.callbacks;
+  const layer = svg
+    .append("g")
+    .attr("class", "a11y-layer")
+    .attr("transform", `translate(${offset.tx},${offset.ty})`);
+
+  const focusOn = (index: number): void => {
+    const n = points.length;
+    if (n === 0) return;
+    const i = ((index % n) + n) % n;
+    const node = layer.selectAll<SVGRectElement, unknown>("rect.a11y-cell").nodes()[i];
+    (node as SVGRectElement | undefined)?.focus();
+  };
+
+  layer
+    .selectAll<SVGRectElement, CategoryPoint>("rect.a11y-cell")
+    .data(points)
+    .enter()
+    .append("rect")
+    .attr("class", "a11y-cell")
+    .attr("data-cat", (d) => d.category)
+    .attr("x", (_d, i) => rectFor(i).x)
+    .attr("y", (_d, i) => rectFor(i).y)
+    .attr("width", (_d, i) => Math.max(0, rectFor(i).w))
+    .attr("height", (_d, i) => Math.max(0, rectFor(i).h))
+    .attr("fill", "transparent")
+    .style("pointer-events", "none")
+    .attr("tabindex", 0)
+    .attr("role", "button")
+    .attr("aria-pressed", (d) => (cfg.callbacks?.selectedCategories?.has(d.category) ? "true" : "false"))
+    .attr("aria-label", (d, i) => buildAriaLabel(d, variance[i], cfg))
+    .on("focus", function () {
+      d3.select(this).attr("stroke", "#000000").attr("stroke-width", 2).attr("stroke-dasharray", "3,2");
+    })
+    .on("blur", function () {
+      d3.select(this).attr("stroke", null).attr("stroke-width", null).attr("stroke-dasharray", null);
+    })
+    .on("keydown", function (event: KeyboardEvent, d) {
+      const i = points.findIndex((p) => p.category === d.category);
+      switch (event.key) {
+        case "ArrowRight":
+        case "ArrowDown":
+          event.preventDefault();
+          focusOn(i + 1);
+          break;
+        case "ArrowLeft":
+        case "ArrowUp":
+          event.preventDefault();
+          focusOn(i - 1);
+          break;
+        case "Home":
+          event.preventDefault();
+          focusOn(0);
+          break;
+        case "End":
+          event.preventDefault();
+          focusOn(points.length - 1);
+          break;
+        case "Enter":
+        case " ":
+          event.preventDefault();
+          cb?.onPointClick?.(d.category, event as unknown as MouseEvent);
+          break;
+        case "Escape":
+          event.preventDefault();
+          cb?.onBackgroundClick?.();
+          break;
+      }
+    });
+}
+
 function colorForVariance(v: number | null, cfg: ChartConfig): string {
   if (v == null) return "transparent";
   if (v > 0) return cfg.colors.positive;
   if (v < 0) return cfg.colors.negative;
   return cfg.colors.zero;
+}
+
+/** Build the combined "Δabs (Δ%)" inline label and its semantic colour for a variance point. */
+function inlineVarianceLabel(v: VariancePoint, cfg: ChartConfig): { text: string; color: string } {
+  const color = colorForVariance(v.absolute, cfg);
+  if (v.absolute == null) return { text: "", color };
+  const abs = formatNumber(v.absolute, {
+    decimals: cfg.decimalsAbs ?? cfg.decimals,
+    negatives: "sign"
+  });
+  const pct = v.percent == null ? "" : formatPercent(v.percent, cfg.decimalsPct ?? 0);
+  return { text: pct ? `${abs} (${pct})` : abs, color };
+}
+
+/** Inline variance for the bar orientation: a right-hand text strip, one row per category. */
+function drawInlineVarianceBar(
+  g: d3.Selection<SVGGElement, unknown, null, undefined>,
+  variance: VariancePoint[],
+  y: d3.ScaleBand<string>,
+  w: number,
+  cfg: ChartConfig
+) {
+  g.append("text")
+    .attr("x", 2)
+    .attr("y", -8)
+    .attr("text-anchor", "start")
+    .attr("font-size", cfg.font.size)
+    .attr("font-weight", "bold")
+    .attr("fill", cfg.font.color)
+    .text(`Δ${cfg.scenario} / Δ${cfg.scenario}%`);
+
+  const band = y.bandwidth();
+  const labels = g
+    .selectAll<SVGTextElement, VariancePoint>("text.inline-var")
+    .data(variance)
+    .enter()
+    .append("text")
+    .attr("class", "inline-var")
+    .attr("data-cat", (d) => d.category)
+    .attr("x", 2)
+    .attr("y", (d) => (y(d.category) ?? 0) + band / 2)
+    .attr("dominant-baseline", "middle")
+    .attr("text-anchor", "start")
+    .attr("font-size", cfg.font.size)
+    .style("cursor", "pointer")
+    .attr("fill", (d) => inlineVarianceLabel(d, cfg).color)
+    .text((d) => inlineVarianceLabel(d, cfg).text);
+  truncateTextEnd<VariancePoint>(labels, () => w - 4);
+
+  attachInteractivity(g, cfg);
+}
+
+/** Inline variance for the column orientation: a combined label above each AC bar top. */
+function drawInlineVarianceColumn(
+  g: d3.Selection<SVGGElement, unknown, null, undefined>,
+  points: CategoryPoint[],
+  variance: VariancePoint[],
+  x: d3.ScaleBand<string>,
+  h: number,
+  cfg: ChartConfig
+) {
+  // Recompute the base value scale identically to drawBaseTierColumn so labels sit above bars.
+  const vals = points.flatMap((p) => [p.actual ?? 0, p.reference ?? 0]);
+  const max = d3.max(vals) ?? 1;
+  const min = Math.min(0, d3.min(vals) ?? 0);
+  const y = d3.scaleLinear().domain([min, max]).nice().range([h, 0]);
+  const band = x.bandwidth();
+
+  const labels = g
+    .selectAll<SVGTextElement, VariancePoint>("text.inline-var")
+    .data(variance)
+    .enter()
+    .append("text")
+    .attr("class", "inline-var")
+    .attr("data-cat", (d) => d.category)
+    .attr("x", (d) => (x(d.category) ?? 0) + band / 2)
+    // One line above the AC value label, clamped within the tier top.
+    .attr("y", (_d, i) =>
+      Math.max(cfg.font.size, y(points[i].actual ?? 0) - 2 - cfg.font.size)
+    )
+    .attr("text-anchor", "middle")
+    .attr("font-size", cfg.font.size)
+    .style("cursor", "pointer")
+    .attr("fill", (d) => inlineVarianceLabel(d, cfg).color)
+    .text((d) => inlineVarianceLabel(d, cfg).text);
+  truncateTextEnd<VariancePoint>(labels, () => band + TIER_GAP);
+
+  attachInteractivity(g, cfg);
 }
 
 export const PALETTE = {

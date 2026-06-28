@@ -37,11 +37,14 @@ export class Visual implements IVisual {
     private selectionIdByCategory: Map<string, ISelectionId> = new Map();
     private pointsByCategory: Map<string, CategoryPoint> = new Map();
     private lastOptions?: VisualUpdateOptions;
+    private topNControls: HTMLDivElement;
+    private topNLabel: HTMLSpanElement;
 
     constructor(options: VisualConstructorOptions) {
         this.host = options.host;
         this.target = options.element;
         this.target.style.overflow = "hidden";
+        this.target.style.position = "relative";
         this.formattingSettingsService = new FormattingSettingsService();
         this.selectionManager = options.host.createSelectionManager();
         this.tooltipService = options.host.tooltipService;
@@ -55,6 +58,51 @@ export class Visual implements IVisual {
         const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
         wrap.appendChild(svg);
         this.svg = svg;
+
+        this.buildTopNControls();
+    }
+
+    /** In-visual stepper that increases/decreases the Top N count and persists it. */
+    private buildTopNControls(): void {
+        const ctrls = document.createElement("div");
+        ctrls.style.cssText =
+            "position:absolute;top:4px;right:6px;display:none;gap:4px;align-items:center;z-index:10;" +
+            "font:11px 'Segoe UI',sans-serif;background:rgba(255,255,255,0.85);border:1px solid #ddd;" +
+            "border-radius:4px;padding:2px 4px;";
+        const mk = (text: string, title: string): HTMLButtonElement => {
+            const b = document.createElement("button");
+            b.textContent = text;
+            b.title = title;
+            b.setAttribute("aria-label", title);
+            b.style.cssText =
+                "width:18px;height:18px;line-height:1;cursor:pointer;border:1px solid #999;" +
+                "background:#fff;border-radius:3px;padding:0;";
+            return b;
+        };
+        const minus = mk("\u2212", "Show fewer categories (Top N)");
+        const label = document.createElement("span");
+        label.style.cssText = "min-width:42px;text-align:center;color:#333;";
+        const plus = mk("+", "Show more categories (Top N)");
+        minus.onclick = (e) => { e.stopPropagation(); this.stepTopN(-1); };
+        plus.onclick = (e) => { e.stopPropagation(); this.stepTopN(1); };
+        ctrls.appendChild(minus);
+        ctrls.appendChild(label);
+        ctrls.appendChild(plus);
+        this.target.appendChild(ctrls);
+        this.topNControls = ctrls;
+        this.topNLabel = label;
+    }
+
+    private currentTopN(): number {
+        return Math.max(1, Math.round(this.formattingSettings.general.topN.value ?? 5));
+    }
+
+    private stepTopN(delta: number): void {
+        const next = Math.max(1, this.currentTopN() + delta);
+        if (next === this.currentTopN()) return;
+        this.host.persistProperties({
+            merge: [{ objectName: "general", selector: null, properties: { topN: next } }]
+        });
     }
 
     public update(options: VisualUpdateOptions): void {
@@ -108,6 +156,10 @@ export class Visual implements IVisual {
             pctOutlierCutoff: Math.max(0, this.formattingSettings.general.pctOutlierCutoff.value ?? 0),
             absOutlierCutoff: Math.max(0, this.formattingSettings.general.absOutlierCutoff.value ?? 0),
             showFirstLastDelta: this.formattingSettings.general.showFirstLastDelta.value,
+            showReferenceMarker: this.formattingSettings.general.showReferenceMarker.value,
+            topN: this.formattingSettings.general.topNEnabled.value ? this.currentTopN() : 0,
+            showOthers: this.formattingSettings.general.showOthers.value,
+            layoutMode: (this.formattingSettings.general.layoutMode.value.value as ChartConfig["layoutMode"]) ?? "auto",
             font: {
                 family: this.formattingSettings.text.font.fontFamily.value || "Segoe UI, sans-serif",
                 size: Math.max(6, Math.min(40, Math.round(this.formattingSettings.text.font.fontSize.value ?? 9))),
@@ -136,6 +188,11 @@ export class Visual implements IVisual {
         this.scrollWrap.style.height = cfg.height + "px";
         this.scrollWrap.style.overflowY = cfg.enableScrollbar ? "auto" : "hidden";
         this.scrollWrap.style.overflowX = "hidden";
+
+        const topNEnabled = this.formattingSettings.general.topNEnabled.value;
+        this.topNControls.style.display = topNEnabled ? "flex" : "none";
+        if (topNEnabled) this.topNLabel.textContent = "Top " + this.currentTopN();
+
         renderChart(this.svg, data, cfg);
     }
 
@@ -191,22 +248,6 @@ export class Visual implements IVisual {
     public getFormattingModel(): powerbi.visuals.FormattingModel {
         return this.formattingSettingsService.buildFormattingModel(this.formattingSettings);
     }
-}
-
-function extractPoints(dv: DataView | undefined): CategoryPoint[] {
-    if (!dv || !dv.categorical) return [];
-    const cat = dv.categorical.categories && dv.categorical.categories[0];
-    const vals = dv.categorical.values;
-    if (!cat || !vals || vals.length === 0) return [];
-
-    const actualSeries = vals.find((v) => v.source.roles && v.source.roles["actual"]);
-    const refSeries = vals.find((v) => v.source.roles && v.source.roles["reference"]);
-
-    return cat.values.map((c, i) => ({
-        category: c == null ? "" : String(c),
-        actual: actualSeries ? toNum(actualSeries.values[i]) : null,
-        reference: refSeries ? toNum(refSeries.values[i]) : null
-    }));
 }
 
 function toNum(v: powerbi.PrimitiveValue | null | undefined): number | null {

@@ -4,8 +4,10 @@ export interface ScenarioStyle {
   fill: string;
   stroke: string;
   strokeWidth: number;
+  /** Optional dashed border pattern (e.g. FC dotted outline). */
+  strokeDasharray?: string;
   /** SVG <pattern> id; null = solid fill */
-  patternId: "hatch" | null;
+  patternId: "hatch" | "dots" | null;
 }
 
 /** IBCS semantic colors for variance bars/columns. */
@@ -25,7 +27,7 @@ const DARK_GRAY = "#4D4D4D";
  *   PY  = light fill (light version of AC, no border)
  *   PL  = outlined (white fill + dark border)
  *   BU  = outlined (same as PL)
- *   FC  = hatched (Phase 2)
+ *   FC  = dotted outline (dotted border + dotted fill pattern)
  */
 export function getScenarioStyle(s: Scenario, acFill: string = BLACK): ScenarioStyle {
   switch (s) {
@@ -37,6 +39,6 @@ export function getScenarioStyle(s: Scenario, acFill: string = BLACK): ScenarioS
     case "BU":
       return { fill: "#FFFFFF", stroke: DARK_GRAY, strokeWidth: 1, patternId: null };
     case "FC":
-      return { fill: "#FFFFFF", stroke: DARK_GRAY, strokeWidth: 1, patternId: "hatch" };
+      return { fill: "#FFFFFF", stroke: DARK_GRAY, strokeWidth: 1, patternId: "dots", strokeDasharray: "2,2" };
   }
 }
