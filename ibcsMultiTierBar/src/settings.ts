@@ -115,6 +115,12 @@ class GeneralCard extends FormattingSettingsCard {
         value: false
     });
 
+    showReferenceMarker = new formattingSettings.ToggleSwitch({
+        name: "showReferenceMarker",
+        displayName: "Show reference marker",
+        value: true
+    });
+
     minBandPx = new formattingSettings.NumUpDown({
         name: "minBandPx",
         displayName: "Min row height (px)",
@@ -127,7 +133,7 @@ class GeneralCard extends FormattingSettingsCard {
         this.scenario, this.invert, this.showAbsoluteTier, this.showPercentTier,
         this.decimals, this.decimalsAbs, this.decimalsPct,
         this.axisWidthPercent, this.maxVisibleCategories, this.enableScrollbar,
-        this.sortBy, this.sortDir, this.showFirstLastDelta, this.minBandPx,
+        this.sortBy, this.sortDir, this.showFirstLastDelta, this.showReferenceMarker, this.minBandPx,
         this.pctOutlierCutoff, this.absOutlierCutoff
     ];
 }

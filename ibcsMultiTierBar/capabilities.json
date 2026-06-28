@@ -46,6 +46,7 @@
           }
         },
         "showFirstLastDelta": { "type": { "bool": true } },
+        "showReferenceMarker": { "type": { "bool": true } },
         "minBandPx": { "type": { "numeric": true } },
         "pctOutlierCutoff": { "type": { "numeric": true } },
         "absOutlierCutoff": { "type": { "numeric": true } }

@@ -108,6 +108,7 @@ export class Visual implements IVisual {
             pctOutlierCutoff: Math.max(0, this.formattingSettings.general.pctOutlierCutoff.value ?? 0),
             absOutlierCutoff: Math.max(0, this.formattingSettings.general.absOutlierCutoff.value ?? 0),
             showFirstLastDelta: this.formattingSettings.general.showFirstLastDelta.value,
+            showReferenceMarker: this.formattingSettings.general.showReferenceMarker.value,
             font: {
                 family: this.formattingSettings.text.font.fontFamily.value || "Segoe UI, sans-serif",
                 size: Math.max(6, Math.min(40, Math.round(this.formattingSettings.text.font.fontSize.value ?? 9))),
@@ -189,22 +190,6 @@ export class Visual implements IVisual {
     public getFormattingModel(): powerbi.visuals.FormattingModel {
         return this.formattingSettingsService.buildFormattingModel(this.formattingSettings);
     }
-}
-
-function extractPoints(dv: DataView | undefined): CategoryPoint[] {
-    if (!dv || !dv.categorical) return [];
-    const cat = dv.categorical.categories && dv.categorical.categories[0];
-    const vals = dv.categorical.values;
-    if (!cat || !vals || vals.length === 0) return [];
-
-    const actualSeries = vals.find((v) => v.source.roles && v.source.roles["actual"]);
-    const refSeries = vals.find((v) => v.source.roles && v.source.roles["reference"]);
-
-    return cat.values.map((c, i) => ({
-        category: c == null ? "" : String(c),
-        actual: actualSeries ? toNum(actualSeries.values[i]) : null,
-        reference: refSeries ? toNum(refSeries.values[i]) : null
-    }));
 }
 
 function toNum(v: powerbi.PrimitiveValue | null | undefined): number | null {

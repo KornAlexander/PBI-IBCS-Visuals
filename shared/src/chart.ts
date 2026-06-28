@@ -51,6 +51,8 @@ export interface ChartConfig {
   absOutlierCutoff: number;
   /** Column orientation only: draw a line from the first AC bar top to the last AC bar top, with the delta to the right. */
   showFirstLastDelta: boolean;
+  /** Show the IBCS reference marker (triangle glyph) on the base tier pointing from the reference value at the AC bar. */
+  showReferenceMarker: boolean;
   /** Font/text styling applied to all labels, headers and axis text. */
   font: {
     family: string;
@@ -86,6 +88,11 @@ export function renderChart(svgEl: SVGSVGElement, data: ChartData, cfg: ChartCon
   svg.on("click", function (event) {
     if (event.target === this) cfg.callbacks?.onBackgroundClick?.();
   });
+
+  // Accessibility: expose the chart as a labelled group for assistive technology.
+  svg
+    .attr("role", "group")
+    .attr("aria-label", `IBCS integrated variance chart, AC versus ${cfg.scenario}`);
 
   defs(svg);
 
@@ -182,6 +189,16 @@ function defs(svg: d3.Selection<SVGSVGElement, unknown, null, undefined>) {
     .attr("patternTransform", "rotate(45)");
   p.append("rect").attr("width", 4).attr("height", 4).attr("fill", "#FFFFFF");
   p.append("line").attr("x1", 0).attr("y1", 0).attr("x2", 0).attr("y2", 4).attr("stroke", "#4D4D4D").attr("stroke-width", 1);
+
+  // Dotted pattern for FC scenario notation (distinct from PL/BU hatch).
+  const d = defs
+    .append("pattern")
+    .attr("id", "dots")
+    .attr("patternUnits", "userSpaceOnUse")
+    .attr("width", 3)
+    .attr("height", 3);
+  d.append("rect").attr("width", 3).attr("height", 3).attr("fill", "#FFFFFF");
+  d.append("circle").attr("cx", 1).attr("cy", 1).attr("r", 0.6).attr("fill", "#4D4D4D");
 }
 
 /* ----------------------------------------------------------------- COLUMN */
@@ -265,6 +282,13 @@ function renderColumn(
     .text((d) => d.category);
   colLabels.append("title").text((d) => d.category);
   truncateTextEnd<CategoryPoint>(colLabels, () => x.bandwidth() + 2);
+
+  addAccessibilityLayer(svg, points, variance, cfg, { tx: padL, ty: 0 }, (i) => ({
+    x: x(points[i].category) ?? 0,
+    y: 0,
+    w: x.bandwidth(),
+    h: chartH
+  }));
 }
 
 function drawBaseTierColumn(
@@ -313,7 +337,8 @@ function drawBaseTierColumn(
     .attr("height", (d) => Math.abs(y(d.reference ?? 0) - y(0)))
     .attr("fill", refStyle.patternId ? `url(#${refStyle.patternId})` : refStyle.fill)
     .attr("stroke", refStyle.stroke)
-    .attr("stroke-width", refStyle.strokeWidth);
+    .attr("stroke-width", refStyle.strokeWidth)
+    .attr("stroke-dasharray", refStyle.strokeDasharray ?? null);
 
   // AC (right, on top, same size)
   g.selectAll(".bar-ac")
@@ -329,6 +354,23 @@ function drawBaseTierColumn(
     .style("cursor", "pointer");
 
   attachInteractivity(g, cfg);
+
+  // IBCS reference marker: right-pointing glyph at the reference value, pointing at the AC bar.
+  if (cfg.showReferenceMarker) {
+    g.selectAll(".ref-marker")
+      .data(points.filter((p) => p.reference != null && p.actual != null)).enter()
+      .append("text")
+      .attr("class", "ref-marker")
+      .attr("data-cat", (d) => d.category)
+      .attr("x", (d) => (x(d.category) ?? 0) + acOffset - 1)
+      .attr("y", (d) => y(d.reference ?? 0))
+      .attr("text-anchor", "end")
+      .attr("dominant-baseline", "middle")
+      .attr("font-size", Math.max(6, cfg.font.size - 1))
+      .attr("fill", cfg.font.color)
+      .attr("aria-hidden", "true")
+      .text("\u25BA");
+  }
 
   // AC value labels
   g.selectAll(".lbl-ac")
@@ -607,6 +649,13 @@ function renderBar(
     const g = svg.append("g").attr("transform", `translate(${xOff},${padTop})`);
     drawVarianceTierBar(g, variance, y, widths[2], cfg, "pct");
   }
+
+  addAccessibilityLayer(svg, points, variance, cfg, { tx: 0, ty: padTop }, (i) => ({
+    x: 0,
+    y: y(points[i].category) ?? 0,
+    w: chartW,
+    h: y.bandwidth()
+  }));
 }
 
 function drawBaseTierBar(
@@ -652,7 +701,8 @@ function drawBaseTierBar(
     .attr("height", barH)
     .attr("fill", refStyle.patternId ? `url(#${refStyle.patternId})` : refStyle.fill)
     .attr("stroke", refStyle.stroke)
-    .attr("stroke-width", refStyle.strokeWidth);
+    .attr("stroke-width", refStyle.strokeWidth)
+    .attr("stroke-dasharray", refStyle.strokeDasharray ?? null);
 
   // AC (bottom, on top, same size)
   g.selectAll(".bar-ac")
@@ -668,6 +718,23 @@ function drawBaseTierBar(
     .style("cursor", "pointer");
 
   attachInteractivity(g, cfg);
+
+  // IBCS reference marker: down-pointing glyph at the reference value, pointing at the AC bar below it.
+  if (cfg.showReferenceMarker) {
+    g.selectAll(".ref-marker")
+      .data(points.filter((p) => p.reference != null && p.actual != null)).enter()
+      .append("text")
+      .attr("class", "ref-marker")
+      .attr("data-cat", (d) => d.category)
+      .attr("x", (d) => x(d.reference ?? 0))
+      .attr("y", (d) => (y(d.category) ?? 0) + acOffset - 1)
+      .attr("text-anchor", "middle")
+      .attr("dominant-baseline", "ideographic")
+      .attr("font-size", Math.max(6, cfg.font.size - 1))
+      .attr("fill", cfg.font.color)
+      .attr("aria-hidden", "true")
+      .text("\u25BC");
+  }
 
   // AC labels (at end of bar, clamped inside the base tier so they cannot collide with the next tier)
   g.selectAll(".lbl-ac")
@@ -856,6 +923,113 @@ function attachInteractivity(
 
 function numTiers(cfg: ChartConfig): number {
   return 1 + (cfg.showAbsoluteTier ? 1 : 0) + (cfg.showPercentTier ? 1 : 0);
+}
+
+/** Build a screen-reader label summarising a category's AC / reference / Δ / Δ% values. */
+export function buildAriaLabel(p: CategoryPoint, v: VariancePoint, cfg: ChartConfig): string {
+  const na = "no data";
+  const ac = p.actual == null ? na : formatNumber(p.actual, { decimals: cfg.decimals });
+  const ref = p.reference == null ? na : formatNumber(p.reference, { decimals: cfg.decimals });
+  const abs =
+    v.absolute == null
+      ? na
+      : formatNumber(v.absolute, { decimals: cfg.decimalsAbs ?? cfg.decimals, negatives: "sign" });
+  const pct = v.percent == null ? na : formatPercent(v.percent, cfg.decimalsPct ?? 0);
+  return `${p.category}: AC ${ac}, ${cfg.scenario} ${ref}, Δ${cfg.scenario} ${abs}, Δ${cfg.scenario}% ${pct}`;
+}
+
+interface A11yRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/**
+ * Overlay one focusable, labelled rectangle per category so the visual is keyboard
+ * navigable and exposes per-category values to assistive technology. The rectangles are
+ * transparent and pointer-events:none so mouse hit-testing still reaches the underlying bars.
+ *
+ * Keyboard: Arrow keys move focus between categories, Enter/Space selects (cross-filter),
+ * Escape clears the selection.
+ */
+function addAccessibilityLayer(
+  svg: d3.Selection<SVGSVGElement, unknown, null, undefined>,
+  points: CategoryPoint[],
+  variance: VariancePoint[],
+  cfg: ChartConfig,
+  offset: { tx: number; ty: number },
+  rectFor: (index: number) => A11yRect
+): void {
+  const cb = cfg.callbacks;
+  const layer = svg
+    .append("g")
+    .attr("class", "a11y-layer")
+    .attr("transform", `translate(${offset.tx},${offset.ty})`);
+
+  const focusOn = (index: number): void => {
+    const n = points.length;
+    if (n === 0) return;
+    const i = ((index % n) + n) % n;
+    const node = layer.selectAll<SVGRectElement, unknown>("rect.a11y-cell").nodes()[i];
+    (node as SVGRectElement | undefined)?.focus();
+  };
+
+  layer
+    .selectAll<SVGRectElement, CategoryPoint>("rect.a11y-cell")
+    .data(points)
+    .enter()
+    .append("rect")
+    .attr("class", "a11y-cell")
+    .attr("data-cat", (d) => d.category)
+    .attr("x", (_d, i) => rectFor(i).x)
+    .attr("y", (_d, i) => rectFor(i).y)
+    .attr("width", (_d, i) => Math.max(0, rectFor(i).w))
+    .attr("height", (_d, i) => Math.max(0, rectFor(i).h))
+    .attr("fill", "transparent")
+    .style("pointer-events", "none")
+    .attr("tabindex", 0)
+    .attr("role", "button")
+    .attr("aria-pressed", (d) => (cfg.callbacks?.selectedCategories?.has(d.category) ? "true" : "false"))
+    .attr("aria-label", (d, i) => buildAriaLabel(d, variance[i], cfg))
+    .on("focus", function () {
+      d3.select(this).attr("stroke", "#000000").attr("stroke-width", 2).attr("stroke-dasharray", "3,2");
+    })
+    .on("blur", function () {
+      d3.select(this).attr("stroke", null).attr("stroke-width", null).attr("stroke-dasharray", null);
+    })
+    .on("keydown", function (event: KeyboardEvent, d) {
+      const i = points.findIndex((p) => p.category === d.category);
+      switch (event.key) {
+        case "ArrowRight":
+        case "ArrowDown":
+          event.preventDefault();
+          focusOn(i + 1);
+          break;
+        case "ArrowLeft":
+        case "ArrowUp":
+          event.preventDefault();
+          focusOn(i - 1);
+          break;
+        case "Home":
+          event.preventDefault();
+          focusOn(0);
+          break;
+        case "End":
+          event.preventDefault();
+          focusOn(points.length - 1);
+          break;
+        case "Enter":
+        case " ":
+          event.preventDefault();
+          cb?.onPointClick?.(d.category, event as unknown as MouseEvent);
+          break;
+        case "Escape":
+          event.preventDefault();
+          cb?.onBackgroundClick?.();
+          break;
+      }
+    });
 }
 
 function colorForVariance(v: number | null, cfg: ChartConfig): string {
