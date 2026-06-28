@@ -3,6 +3,8 @@ import type { CategoryPoint, Scenario, VariancePoint } from "./types";
 import { computeVarianceSeries } from "./variance";
 import { getScenarioStyle, VARIANCE_COLORS } from "./scenarioStyle";
 import { formatNumber, formatPercent } from "./numberFormat";
+import { applyTopN } from "./topN";
+import { resolveLayout, type LayoutMode } from "./layout";
 
 export type Orientation = "column" | "bar";
 
@@ -53,6 +55,23 @@ export interface ChartConfig {
   showFirstLastDelta: boolean;
   /** Show the IBCS reference marker (triangle glyph) on the base tier pointing from the reference value at the AC bar. */
   showReferenceMarker: boolean;
+  /**
+   * Keep only the leading `topN` categories (after sorting). 0/undefined = show all.
+   * Remaining categories are aggregated into a single "Others" bucket when `showOthers` is true.
+   */
+  topN?: number;
+  /** When true (and `topN` is active), fold the remaining categories into an "Others" point. */
+  showOthers?: boolean;
+  /**
+   * Layout selection. `auto` (default) adapts to the canvas size: inline variance when small,
+   * a single variance tier when medium, and the full multi-tier layout when large.
+   */
+  layoutMode?: LayoutMode;
+  /**
+   * Internal: when true the variance is rendered inline (as combined Δ / Δ% text next to the
+   * base tier) instead of as separate graphical tiers. Resolved from `layoutMode`.
+   */
+  inlineVariance?: boolean;
   /** Font/text styling applied to all labels, headers and axis text. */
   font: {
     family: string;
@@ -96,7 +115,10 @@ export function renderChart(svgEl: SVGSVGElement, data: ChartData, cfg: ChartCon
 
   defs(svg);
 
-  const points = sortPoints(data.points, cfg);
+  const points = applyTopN(sortPoints(data.points, cfg), {
+    topN: cfg.topN ?? 0,
+    showOthers: cfg.showOthers !== false
+  });
   if (!points.length) {
     svg.attr("width", cfg.width).attr("height", cfg.height);
     svg
@@ -112,13 +134,34 @@ export function renderChart(svgEl: SVGSVGElement, data: ChartData, cfg: ChartCon
 
   const variance = computeVarianceSeries(points, cfg.invert);
 
-  if (cfg.orientation === "column") {
-    renderColumn(svg, points, variance, cfg);
+  const eff = resolveEffectiveConfig(cfg);
+
+  if (eff.orientation === "column") {
+    renderColumn(svg, points, variance, eff);
   } else {
-    renderBar(svg, points, variance, cfg);
+    renderBar(svg, points, variance, eff);
   }
 
-  applySelectionDimming(svg, cfg);
+  applySelectionDimming(svg, eff);
+}
+
+/**
+ * Derive the effective configuration for the resolved layout. The user toggles for the
+ * absolute / percent tiers are honoured in `multi`; collapsed to one tier in `single`; and
+ * replaced by inline variance text in `inline`.
+ */
+function resolveEffectiveConfig(cfg: ChartConfig): ChartConfig {
+  const layout = resolveLayout(cfg.layoutMode, cfg.orientation, cfg.width, cfg.height);
+  const eff: ChartConfig = { ...cfg, inlineVariance: false };
+  if (layout === "inline") {
+    eff.inlineVariance = true;
+    eff.showAbsoluteTier = false;
+    eff.showPercentTier = false;
+  } else if (layout === "single") {
+    // Collapse to a single variance tier, preferring the absolute tier.
+    if (cfg.showAbsoluteTier) eff.showPercentTier = false;
+  }
+  return eff;
 }
 
 function applySelectionDimming(
@@ -265,6 +308,10 @@ function renderColumn(
   // Base tier (now at the bottom, deviations sit above it)
   const baseG = svg.append("g").attr("transform", `translate(${padL},${yOff})`);
   drawBaseTierColumn(baseG, points, x, tierH[2], cfg);
+  if (cfg.inlineVariance) {
+    const ig = svg.append("g").attr("transform", `translate(${padL},${yOff})`);
+    drawInlineVarianceColumn(ig, points, variance, x, tierH[2], cfg);
+  }
   yOff += tierH[2];
 
   // Category axis
@@ -621,6 +668,24 @@ function renderBar(
   truncateTextEnd<CategoryPoint>(labels, () => axisW - 8);
 
   const totalW = chartW - axisW;
+
+  if (cfg.inlineVariance) {
+    const inlineW = Math.max(72, Math.min(180, Math.round(totalW * 0.34)));
+    const baseW = Math.max(40, totalW - inlineW - TIER_GAP);
+    const baseG = svg.append("g").attr("transform", `translate(${axisW},${padTop})`);
+    drawBaseTierBar(baseG, points, y, baseW, cfg);
+    const ig = svg.append("g").attr("transform", `translate(${axisW + baseW + TIER_GAP},${padTop})`);
+    drawInlineVarianceBar(ig, variance, y, inlineW, cfg);
+
+    addAccessibilityLayer(svg, points, variance, cfg, { tx: 0, ty: padTop }, (i) => ({
+      x: 0,
+      y: y(points[i].category) ?? 0,
+      w: chartW,
+      h: y.bandwidth()
+    }));
+    return;
+  }
+
   const ratios = [60, cfg.showAbsoluteTier ? 20 : 0, cfg.showPercentTier ? 20 : 0];
   const sum = ratios.reduce((a, b) => a + b, 0) || 60;
   const usableW = totalW - TIER_GAP * (numTiers(cfg) - 1);
@@ -1037,6 +1102,94 @@ function colorForVariance(v: number | null, cfg: ChartConfig): string {
   if (v > 0) return cfg.colors.positive;
   if (v < 0) return cfg.colors.negative;
   return cfg.colors.zero;
+}
+
+/** Build the combined "Δabs (Δ%)" inline label and its semantic colour for a variance point. */
+function inlineVarianceLabel(v: VariancePoint, cfg: ChartConfig): { text: string; color: string } {
+  const color = colorForVariance(v.absolute, cfg);
+  if (v.absolute == null) return { text: "", color };
+  const abs = formatNumber(v.absolute, {
+    decimals: cfg.decimalsAbs ?? cfg.decimals,
+    negatives: "sign"
+  });
+  const pct = v.percent == null ? "" : formatPercent(v.percent, cfg.decimalsPct ?? 0);
+  return { text: pct ? `${abs} (${pct})` : abs, color };
+}
+
+/** Inline variance for the bar orientation: a right-hand text strip, one row per category. */
+function drawInlineVarianceBar(
+  g: d3.Selection<SVGGElement, unknown, null, undefined>,
+  variance: VariancePoint[],
+  y: d3.ScaleBand<string>,
+  w: number,
+  cfg: ChartConfig
+) {
+  g.append("text")
+    .attr("x", 2)
+    .attr("y", -8)
+    .attr("text-anchor", "start")
+    .attr("font-size", cfg.font.size)
+    .attr("font-weight", "bold")
+    .attr("fill", cfg.font.color)
+    .text(`Δ${cfg.scenario} / Δ${cfg.scenario}%`);
+
+  const band = y.bandwidth();
+  const labels = g
+    .selectAll<SVGTextElement, VariancePoint>("text.inline-var")
+    .data(variance)
+    .enter()
+    .append("text")
+    .attr("class", "inline-var")
+    .attr("data-cat", (d) => d.category)
+    .attr("x", 2)
+    .attr("y", (d) => (y(d.category) ?? 0) + band / 2)
+    .attr("dominant-baseline", "middle")
+    .attr("text-anchor", "start")
+    .attr("font-size", cfg.font.size)
+    .style("cursor", "pointer")
+    .attr("fill", (d) => inlineVarianceLabel(d, cfg).color)
+    .text((d) => inlineVarianceLabel(d, cfg).text);
+  truncateTextEnd<VariancePoint>(labels, () => w - 4);
+
+  attachInteractivity(g, cfg);
+}
+
+/** Inline variance for the column orientation: a combined label above each AC bar top. */
+function drawInlineVarianceColumn(
+  g: d3.Selection<SVGGElement, unknown, null, undefined>,
+  points: CategoryPoint[],
+  variance: VariancePoint[],
+  x: d3.ScaleBand<string>,
+  h: number,
+  cfg: ChartConfig
+) {
+  // Recompute the base value scale identically to drawBaseTierColumn so labels sit above bars.
+  const vals = points.flatMap((p) => [p.actual ?? 0, p.reference ?? 0]);
+  const max = d3.max(vals) ?? 1;
+  const min = Math.min(0, d3.min(vals) ?? 0);
+  const y = d3.scaleLinear().domain([min, max]).nice().range([h, 0]);
+  const band = x.bandwidth();
+
+  const labels = g
+    .selectAll<SVGTextElement, VariancePoint>("text.inline-var")
+    .data(variance)
+    .enter()
+    .append("text")
+    .attr("class", "inline-var")
+    .attr("data-cat", (d) => d.category)
+    .attr("x", (d) => (x(d.category) ?? 0) + band / 2)
+    // One line above the AC value label, clamped within the tier top.
+    .attr("y", (_d, i) =>
+      Math.max(cfg.font.size, y(points[i].actual ?? 0) - 2 - cfg.font.size)
+    )
+    .attr("text-anchor", "middle")
+    .attr("font-size", cfg.font.size)
+    .style("cursor", "pointer")
+    .attr("fill", (d) => inlineVarianceLabel(d, cfg).color)
+    .text((d) => inlineVarianceLabel(d, cfg).text);
+  truncateTextEnd<VariancePoint>(labels, () => band + TIER_GAP);
+
+  attachInteractivity(g, cfg);
 }
 
 export const PALETTE = {

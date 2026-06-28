@@ -47,6 +47,19 @@
         },
         "showFirstLastDelta": { "type": { "bool": true } },
         "showReferenceMarker": { "type": { "bool": true } },
+        "topNEnabled": { "type": { "bool": true } },
+        "topN": { "type": { "numeric": true } },
+        "showOthers": { "type": { "bool": true } },
+        "layoutMode": {
+          "type": {
+            "enumeration": [
+              { "value": "auto", "displayName": "Auto (fit to canvas)" },
+              { "value": "multi", "displayName": "Multi-tier (Δ + Δ%)" },
+              { "value": "single", "displayName": "Single variance tier" },
+              { "value": "inline", "displayName": "Inline variance" }
+            ]
+          }
+        },
         "minBandPx": { "type": { "numeric": true } },
         "pctOutlierCutoff": { "type": { "numeric": true } },
         "absOutlierCutoff": { "type": { "numeric": true } }

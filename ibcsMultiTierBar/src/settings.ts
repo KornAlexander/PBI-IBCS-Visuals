@@ -121,6 +121,36 @@ class GeneralCard extends FormattingSettingsCard {
         value: true
     });
 
+    topNEnabled = new formattingSettings.ToggleSwitch({
+        name: "topNEnabled",
+        displayName: "Enable Top N",
+        value: false
+    });
+
+    topN = new formattingSettings.NumUpDown({
+        name: "topN",
+        displayName: "Top N categories",
+        value: 5
+    });
+
+    showOthers = new formattingSettings.ToggleSwitch({
+        name: "showOthers",
+        displayName: "Show \u201cOthers\u201d (group remaining)",
+        value: true
+    });
+
+    layoutMode = new formattingSettings.ItemDropdown({
+        name: "layoutMode",
+        displayName: "Variance layout",
+        items: [
+            { value: "auto", displayName: "Auto (fit to canvas)" },
+            { value: "multi", displayName: "Multi-tier (Δ + Δ%)" },
+            { value: "single", displayName: "Single variance tier" },
+            { value: "inline", displayName: "Inline variance" }
+        ],
+        value: { value: "auto", displayName: "Auto (fit to canvas)" }
+    });
+
     minBandPx = new formattingSettings.NumUpDown({
         name: "minBandPx",
         displayName: "Min row height (px)",
@@ -133,7 +163,8 @@ class GeneralCard extends FormattingSettingsCard {
         this.scenario, this.invert, this.showAbsoluteTier, this.showPercentTier,
         this.decimals, this.decimalsAbs, this.decimalsPct,
         this.axisWidthPercent, this.maxVisibleCategories, this.enableScrollbar,
-        this.sortBy, this.sortDir, this.showFirstLastDelta, this.showReferenceMarker, this.minBandPx,
+        this.sortBy, this.sortDir, this.showFirstLastDelta, this.showReferenceMarker,
+        this.topNEnabled, this.topN, this.showOthers, this.layoutMode, this.minBandPx,
         this.pctOutlierCutoff, this.absOutlierCutoff
     ];
 }
