@@ -126,7 +126,8 @@ export function renderChart(svgEl: SVGSVGElement, data: ChartData, cfg: ChartCon
 
   defs(svg);
 
-  const points = applyTopN(sortPoints(fillMissingValues(data.points, cfg.emptyValueMode ?? "gap"), cfg), {
+  const filledPoints = fillMissingValues(data.points, cfg.emptyValueMode ?? "gap");
+  const points = applyTopN(sortPoints(filledPoints, cfg), {
     topN: cfg.topN ?? 0,
     showOthers: cfg.showOthers !== false,
     from: cfg.topNFrom ?? "top"
